@@ -1,0 +1,86 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2>Mis Mensajes</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal_usuario' %}">Portal de Usuario</a></li>
+                <li class="breadcrumb-item active">Mensajes</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Menú de navegación del portal -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{% url 'portal_usuario' %}" class="btn btn-outline-primary">Inicio</a>
+            <a href="{% url 'editar_perfil' %}" class="btn btn-outline-primary">Mi Perfil</a>
+            <a href="{% url 'direcciones_usuario' %}" class="btn btn-outline-primary">Direcciones</a>
+            <a href="{% url 'mensajes_comprador' %}" class="btn btn-primary">Mensajes</a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        {% if order_items %}
+            {% for order_item in order_items %}
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Pedido #{{ order_item.order.id }} - {{ order_item.product_name }}</h5>
+                        <small class="text-muted">
+                            Vendedor: {{ order_item.seller.first_name|default:order_item.seller.username }}
+                            | Estado: <span class="badge bg-info">{{ order_item.get_status_display }}</span>
+                        </small>
+                    </div>
+                    <span class="text-muted">{{ order_item.created_at|date:"d/m/Y" }}</span>
+                </div>
+                <div class="card-body">
+                    {% if order_item.messages.all %}
+                    <h6 class="mb-3">Mensajes:</h6>
+                    <div class="list-group mb-3">
+                        {% for message in order_item.messages.all %}
+                        <div class="list-group-item {% if message.sender == user %}bg-light{% endif %}">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">
+                                    {% if message.sender == user %}
+                                        Tú
+                                    {% else %}
+                                        {{ message.sender.first_name|default:message.sender.username }} (Vendedor)
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">{{ message.created_at|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <p class="mb-0">{{ message.message }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No hay mensajes para este pedido.</p>
+                    {% endif %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Producto:</strong> {{ order_item.product_name }}</p>
+                            <p class="mb-1"><strong>Cantidad:</strong> {{ order_item.quantity }}</p>
+                            <p class="mb-1"><strong>Precio Total:</strong> {{ order_item.total_price }}€</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                <p class="mb-0">No tienes mensajes de vendedores. Los mensajes relacionados con tus pedidos aparecerán aquí.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

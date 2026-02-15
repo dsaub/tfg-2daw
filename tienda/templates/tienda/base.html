@@ -1,0 +1,247 @@
+{% load static %}
+{% load compress %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <style>
+        .search-suggestions-container {
+            position: relative;
+            flex-grow: 1;
+            margin: 0 12px;
+        }
+        
+        .search-suggestions {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .search-suggestions.show {
+            display: block;
+        }
+        
+        .search-suggestion-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .search-suggestion-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .search-suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .suggestion-name {
+            font-weight: 500;
+            color: #212529;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .suggestion-price {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        
+        .search-highlight {
+            font-weight: 600;
+            color: #0d6efd;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-md header">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <img src="{% static 'img/logo.png' %}" alt="Logo" style="height: 40px;">
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <span class="navbar-text fw-semibold me-3">Comercialmeria</span>
+                <!-- Barra de búsqueda con sugerencias -->
+                <form class="search-suggestions-container" method="GET" action="{% url 'search' %}" role="search" id="searchForm">
+                    <div class="input-group">
+                        <input class="form-control" type="search" name="q" id="searchInput" placeholder="Buscar productos..." aria-label="Buscar" autocomplete="off">
+                        <button class="btn btn-outline-primary" type="submit">🔍</button>
+                    </div>
+                    <div class="search-suggestions" id="searchSuggestions"></div>
+                </form>
+                
+                <div class="navbar-nav ms-auto d-flex align-items-md-center gap-2 flex-wrap">
+                    <a href="{% url 'view_cart' %}" class="nav-link position-relative btn btn-outline-primary btn-sm">
+                        🛒 Carrito
+                        {% if cart_count > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                            {{ cart_count }}
+                        </span>
+                        {% endif %}
+                    </a>
+                    
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'mis_productos' %}" class="nav-link btn btn-outline-secondary btn-sm">Panel Vendedor</a>
+                        <span class="nav-text d-none d-md-inline text-muted">{{ user.first_name|default:user.username }}</span>
+                        <a href="{% url 'logout' %}" class="nav-link btn btn-primary btn-sm">Cerrar Sesión</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="nav-link btn btn-primary btn-sm">Iniciar Sesión</a>
+                        <a href="{% url 'register' %}" class="nav-link btn btn-outline-primary btn-sm">Registrarse</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <!-- Mensajes -->
+        {% if messages %}
+        <div class="row mt-3">
+            <div class="col-12">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Contenido-->
+        {% block content %}{% endblock %}
+
+        <!-- Footer-->
+        <div id="footer" class="row pt-2 pb-2 mt-5">
+                <div class="col-md-12 grid">
+                    <p class="text-center">Enlace 1</p>
+                    <p class="text-center">Enlace 2</p>
+                    <p class="text-center">Enlace 3</p>
+                    <p class="text-center">Enlace 4</p>
+                    <p class="text-center">Enlace 5</p>
+                    <p class="text-center">Enlace 6</p>
+                    <p class="text-center">Enlace 7</p>
+                    <p class="text-center">Enlace 8</p>
+                    <p class="text-center">Enlace 9</p>
+                    <p class="text-center">Enlace 10</p>
+                    <p class="text-center">Enlace 11</p>
+                    <p class="text-center">Enlace 12</p>
+                    <p class="text-center">Enlace 13</p>
+                    <p class="text-center">Enlace 14</p>
+                    <p class="text-center">Enlace 15</p>
+                    <p class="text-center">Enlace 16</p>
+                </div>
+            </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    
+    <script>
+        // Sistema de sugerencias de búsqueda en tiempo real
+        const searchInput = document.getElementById('searchInput');
+        const searchSuggestions = document.getElementById('searchSuggestions');
+        const searchForm = document.getElementById('searchForm');
+        let searchTimeout;
+
+        // Escuchar cambios en el input
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                searchSuggestions.classList.remove('show');
+                return;
+            }
+
+            // Debounce: esperar 300ms después de dejar de escribir
+            searchTimeout = setTimeout(() => {
+                fetchSuggestions(query);
+            }, 300);
+        });
+
+        // Función para obtener sugerencias del servidor
+        function fetchSuggestions(query) {
+            fetch(`{% url 'search_suggestions' %}?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    displaySuggestions(data.suggestions, query);
+                })
+                .catch(error => {
+                    console.error('Error fetching suggestions:', error);
+                    searchSuggestions.classList.remove('show');
+                });
+        }
+
+        // Función para mostrar las sugerencias
+        function displaySuggestions(suggestions, query) {
+            if (suggestions.length === 0) {
+                searchSuggestions.innerHTML = '<div class="search-suggestion-item text-muted">No se encontraron productos</div>';
+                searchSuggestions.classList.add('show');
+                return;
+            }
+
+            let html = '';
+            suggestions.forEach(suggestion => {
+                // Resaltar la coincidencia en el nombre
+                const highlightedName = highlightMatch(suggestion.name, query);
+                const priceWithVAT = (suggestion.price * 1.21).toFixed(2);
+                html += `
+                    <a href="/tienda/producto/${suggestion.id}" class="search-suggestion-item text-decoration-none">
+                        <span class="suggestion-name">${highlightedName}</span>
+                        <span class="suggestion-price">€${priceWithVAT}</span>
+                    </a>
+                `;
+            });
+
+            searchSuggestions.innerHTML = html;
+            searchSuggestions.classList.add('show');
+        }
+
+        // Función para resaltar el texto que coincide
+        function highlightMatch(text, query) {
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+
+        // Cerrar sugerencias cuando se hace clic fuera
+        document.addEventListener('click', function(event) {
+            if (!searchForm.contains(event.target)) {
+                searchSuggestions.classList.remove('show');
+            }
+        });
+
+        // Cerrar sugerencias al enviar el formulario
+        searchForm.addEventListener('submit', function() {
+            searchSuggestions.classList.remove('show');
+        });
+
+        // Mostrar sugerencias al hacer clic en el input (si hay texto)
+        searchInput.addEventListener('focus', function() {
+            if (this.value.trim().length >= 2 && searchSuggestions.innerHTML) {
+                searchSuggestions.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html>

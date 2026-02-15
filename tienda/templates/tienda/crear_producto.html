@@ -1,0 +1,92 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4 mb-5">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Crear Nuevo Producto</h2>
+            <a href="{% url 'mis_productos' %}" class="btn btn-outline-secondary">← Volver a Mis Productos</a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <!-- Nombre del producto -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nombre del Producto <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required maxlength="200" 
+                               placeholder="Ej: iPhone 15 Pro Max">
+                    </div>
+
+                    <!-- Descripción breve -->
+                    <div class="mb-3">
+                        <label for="briefdesc" class="form-label">Descripción Breve</label>
+                        <input type="text" class="form-control" id="briefdesc" name="briefdesc" maxlength="250"
+                               placeholder="Una descripción corta para mostrar en las tarjetas de producto">
+                        <div class="form-text">Opcional. Se mostrará en las vistas de listado de productos.</div>
+                    </div>
+
+                    <!-- Descripción completa -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Descripción Completa <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="description" name="description" rows="5" required
+                                  placeholder="Describe tu producto en detalle..."></textarea>
+                    </div>
+
+                    <!-- Precio -->
+                    <div class="mb-3">
+                        <label for="price" class="form-label">Precio <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">€</span>
+                            <input type="number" class="form-control" id="price" name="price" required 
+                                   min="0" step="0.01" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <!-- Categoría -->
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Categoría <span class="text-danger">*</span></label>
+                        <select class="form-select" id="category" name="category" required>
+                            <option value="" selected disabled>Selecciona una categoría</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Imagen principal -->
+                    <div class="mb-3">
+                        <label for="primary_image" class="form-label">Imagen Principal</label>
+                        <input type="file" class="form-control" id="primary_image" name="primary_image" 
+                               accept="image/*">
+                        <div class="form-text">Opcional. Esta será la imagen destacada del producto.</div>
+                    </div>
+
+                    <!-- Imágenes secundarias -->
+                    <div class="mb-4">
+                        <label for="secondary_images" class="form-label">Imágenes Secundarias</label>
+                        <input type="file" class="form-control" id="secondary_images" name="secondary_images" 
+                               accept="image/*" multiple>
+                        <div class="form-text">Opcional. Puedes seleccionar múltiples imágenes adicionales.</div>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'mis_productos' %}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Crear Producto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <small class="text-muted">
+                <span class="text-danger">*</span> Campos obligatorios
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}

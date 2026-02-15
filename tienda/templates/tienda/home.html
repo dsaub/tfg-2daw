@@ -1,0 +1,235 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+{% load vat_filters %}
+
+{% block head %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 80px 20px;
+        text-align: center;
+        margin-bottom: 60px;
+        border-radius: 8px;
+    }
+    
+    .hero-section h1 {
+        font-size: 3rem;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+    
+    .hero-section p {
+        font-size: 1.25rem;
+        margin-bottom: 30px;
+        opacity: 0.9;
+    }
+    
+    .hero-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .hero-buttons .btn {
+        padding: 12px 30px;
+        font-size: 1.1rem;
+    }
+    
+    .featured-section {
+        margin-bottom: 60px;
+    }
+    
+    .featured-section h2 {
+        margin-bottom: 40px;
+        font-size: 2rem;
+        text-align: center;
+        color: #212529;
+    }
+    
+    .categories-section {
+        background-color: #f8f9fa;
+        padding: 40px 20px;
+        border-radius: 8px;
+        margin-bottom: 60px;
+    }
+    
+    .categories-section h2 {
+        margin-bottom: 30px;
+        font-size: 1.8rem;
+        text-align: center;
+        color: #212529;
+    }
+    
+    .category-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+    
+    .category-card h3 {
+        color: #667eea;
+        margin-bottom: 10px;
+    }
+    
+    .category-card a {
+        display: inline-block;
+        margin-top: 15px;
+        text-decoration: none;
+    }
+    
+    .product-card {
+        transition: transform 0.3s ease;
+    }
+    
+    .product-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stats-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 8px;
+        margin-bottom: 60px;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    
+    .stat-label {
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero-section">
+    <h1>Bienvenido a Comercialmeria</h1>
+    <p>De almerienses, para Almerienses</p>
+    <div class="hero-buttons">
+        <a href="{% url 'productos' %}" class="btn btn-light btn-lg">
+            🛍️ Explorar Productos
+        </a>
+        <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg">
+            📝 Registrarse
+        </a>
+    </div>
+</div>
+
+<!-- Estadísticas -->
+<div class="row stats-section mb-5">
+    <div class="col-md-6 stat-item">
+        <div class="stat-number">{{ total_products }}</div>
+        <div class="stat-label">Producto{{ total_products|pluralize }}</div>
+    </div>
+    <div class="col-md-6 stat-item">
+        <div class="stat-number">{{ total_sellers }}</div>
+        <div class="stat-label">Usuario{{ total_sellers|pluralize }}</div>
+    </div>
+    
+</div>
+
+<!-- Productos Destacados -->
+{% if featured_products %}
+<div class="featured-section">
+    <h2>✨ Productos Destacados</h2>
+    <div class="row g-4">
+        {% for product in featured_products %}
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="card product-card h-100">
+                    {% if product.primary_image %}
+                        <img src="{{ product.primary_image.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 250px; object-fit: cover;">
+                    {% else %}
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 250px;">
+                            <span class="text-muted">Sin imagen</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        
+                        {% if product.briefdesc %}
+                            <p class="card-text text-muted small">{{ product.briefdesc|truncatewords:10 }}</p>
+                        {% endif %}
+                        
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="price-info">
+                                    <div class="small text-muted">Sin IVA: €{{ product.price|format_price }}</div>
+                                    <span class="h5 mb-0 text-primary">IVA incl: €{{ product.get_price_with_vat|format_price }}</span>
+                                </div>
+                                {% if product.creator %}
+                                    <small class="text-muted">{{ product.creator.first_name|default:product.creator.username }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="gap-2 d-flex">
+                                <a href="{% url 'producto' product.id %}" class="btn btn-primary btn-sm flex-grow-1">
+                                    Ver detalles
+                                </a>
+                                <a href="{% url 'add_to_cart' product.id %}" class="btn btn-outline-primary btn-sm">
+                                    🛒
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Categorías -->
+{% if categories %}
+<div class="categories-section">
+    <h2>📂 Categorías Populares</h2>
+    <div class="row g-3">
+        {% for category in categories %}
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="category-card">
+                    <h3>{{ category.name }}</h3>
+                    <p class="text-muted">Explora esta categoría</p>
+                    <a href="{% url 'categoria' category.id %}" class="btn btn-sm btn-outline-primary">
+                        Ver más →
+                    </a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Call to Action -->
+<div class="row mt-5 mb-5">
+    <div class="col-md-12">
+        <div style="background-color: #f8f9fa; padding: 40px; border-radius: 8px; text-align: center;">
+            <h2>¿Quieres vender con nosotros?</h2>
+            <p style="font-size: 1.1rem; color: #666; margin-bottom: 20px;">
+                Únete a nuestra comunidad de vendedores y comienza a ganar dinero hoy
+            </p>
+            <a href="{% url 'register' %}" class="btn btn-primary btn-lg">
+                Crear Cuenta
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

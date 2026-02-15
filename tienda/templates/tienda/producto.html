@@ -1,0 +1,58 @@
+{% extends "tienda/base.html" %}
+{% load vat_filters %}
+{% block content %}
+
+<div class="row mt-2">
+    <div class="col-md-4">
+        <div id="carouselProducto" class="carousel slide">
+            <div class="carousel-inner">
+                <div class="carousel-item active">
+                    <img src="/media/{{ product.primary_image.image }}" class="d-block w-100">
+                </div>
+                {% for image in product.secondary_images.all %}
+                    <div class="carousel-item">
+                        <img src="/media/{{ image.image }}" class="d-block w-100">
+                    </div>
+                {% endfor %}
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#carouselProducto" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#carouselProducto" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Siguiente</span>
+            </button>
+        </div>
+    </div>
+    <div class="col-md-1"></div>
+    <div class="col-md-5">
+        <h1>{{product.name}}</h1>
+        <div class="price-section mb-4">
+            <div class="small text-muted mb-2">Precio sin IVA (21%):</div>
+            <div class="price text-muted mb-3" style="text-decoration: line-through;">€{{ product.price|format_price }}</div>
+            
+            <div class="small text-primary font-weight-bold mb-2">Precio total (IVA incluido):</div>
+            <span class="price" style="font-size: 2rem; color: #28a745;">€{{ product.get_price_with_vat|format_price }}</span>
+            <div class="small text-success mt-2">IVA: €{{ product.get_vat_amount|format_price }}</div>
+        </div>
+        <div id="descripcion">
+            {{ product.briefdesc }}
+        </div>
+        
+        <form method="post" action="{% url 'add_to_cart' product.id %}" class="mt-4">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="quantity" class="form-label">Cantidad:</label>
+                <input type="number" name="quantity" id="quantity" value="1" min="1" class="form-control" style="max-width: 100px;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">🛒 Agregar al Carrito</button>
+        </form>
+    </div>
+</div>
+<div class="row pt-2 pb-2">
+    <div class="col-md-12">
+        {{ product.description }}
+    </div>
+</div>
+{% endblock %}

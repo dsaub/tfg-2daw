@@ -1,0 +1,14 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12 text-center">
+        <div class="alert alert-warning p-5">
+            <h2 class="mb-3">Pago cancelado</h2>
+            <p class="mb-4">No se realizó ningún cargo. Puedes intentarlo de nuevo.</p>
+            <a href="{% url 'checkout' %}" class="btn btn-primary">Volver al checkout</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

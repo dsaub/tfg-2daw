@@ -1,0 +1,42 @@
+{% extends "tienda/base.html" %}
+{% load vat_filters %}
+{% block content %}
+<div class="row mt-2">
+    <div class="col-md-2 d-none d-lg-block">
+        <h5 class="categorias-titulo">Categorias</h5>
+        <ul class="list-group categorias-lista">
+            {% if categories %}
+                {% for category in categories %}
+                    <li class="list-group-item categoria-item">
+                        <a href="{% url 'categoria' category.id %}">{{ category.name }}</a>
+                    </li>
+                {% endfor %}
+            {% endif %}
+        </ul>
+    </div>
+    <div class="col-12 col-md-10 grid">
+        {% if products %}
+            {% for producto in products %}
+                <div class="card card-producto mt-5" style="width: 18rem;">
+                    <img src="/media/{{ producto.primary_image.image}}" class="card-img-top" alt="{{ producto.name }}">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ producto.name }}</h5>
+                        <div class="card-text price-info mb-3">
+                            <small class="text-muted d-block">Sin IVA: €{{ producto.price|format_price }}</small>
+                            <p class="price mb-0">IVA incl: €{{ producto.get_price_with_vat|format_price }}</p>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'producto' producto.id %}" class="btn btn-primary">Ver más</a>
+                            <form method="post" action="{% url 'add_to_cart' producto.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="quantity" value="1">
+                                <button type="submit" class="btn btn-outline-primary w-100">🛒 Agregar al Carrito</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

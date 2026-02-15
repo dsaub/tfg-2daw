@@ -1,0 +1,70 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2>{% if direccion %}Editar Dirección{% else %}Nueva Dirección{% endif %}</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal_usuario' %}">Portal de Usuario</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'direcciones_usuario' %}">Direcciones</a></li>
+                <li class="breadcrumb-item active">{% if direccion %}Editar{% else %}Nueva{% endif %}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">Nombre Completo *</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" value="{{ direccion.full_name|default:'' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="address_line_1" class="form-label">Dirección *</label>
+                        <input type="text" class="form-control" id="address_line_1" name="address_line_1" value="{{ direccion.address_line_1|default:'' }}" placeholder="Calle, número, piso, puerta" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="address_line_2" class="form-label">Dirección (línea 2)</label>
+                        <input type="text" class="form-control" id="address_line_2" name="address_line_2" value="{{ direccion.address_line_2|default:'' }}" placeholder="Edificio, bloque, etc. (opcional)">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="city" class="form-label">Ciudad *</label>
+                            <input type="text" class="form-control" id="city" name="city" value="{{ direccion.city|default:'' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="postal_code" class="form-label">Código Postal *</label>
+                            <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ direccion.postal_code|default:'' }}" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="country" class="form-label">País *</label>
+                        <input type="text" class="form-control" id="country" name="country" value="{{ direccion.country|default:'España' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Teléfono *</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" value="{{ direccion.phone|default:'' }}" placeholder="+34 600 000 000" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_default" name="is_default" {% if direccion.is_default %}checked{% endif %}>
+                        <label class="form-check-label" for="is_default">
+                            Establecer como dirección predeterminada
+                        </label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">{% if direccion %}Actualizar{% else %}Crear{% endif %} Dirección</button>
+                        <a href="{% url 'direcciones_usuario' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

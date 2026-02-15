@@ -1,0 +1,185 @@
+from django.db import models
+from django.contrib.auth.models import User
+from .vars import VAT_RATE
+
+# Create your models here.
+class Category(models.Model):
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
+class Image(models.Model):
+    name = models.CharField(max_length=200, default="")
+    image = models.ImageField(upload_to='images/')
+
+    def __str__(self):
+        return self.name
+
+class Product(models.Model):
+    name = models.CharField(max_length=200, default="")
+    description = models.TextField(default = "")
+    briefdesc = models.TextField(default = "")
+    price = models.FloatField(default = 0)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    primary_image = models.ForeignKey(Image, on_delete=models.SET_NULL, null=True)
+    secondary_images = models.ManyToManyField(Image, related_name='products_secondary', blank=True)
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_products', null=True, blank=True)
+    
+    def __str__(self):
+        return self.name + " " + str(self.price)
+    
+    def get_price_with_vat(self):
+        """Retorna el precio con IVA incluido"""
+        return round(self.price * (1 + VAT_RATE), 2)
+    
+    def get_vat_amount(self):
+        """Retorna la cantidad de IVA"""
+        return round(self.price * VAT_RATE, 2)
+
+
+class Cart(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    session_key = models.CharField(max_length=40, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Cart {self.id} - {self.user or self.session_key}"
+    
+    def get_total(self):
+        return sum(item.get_subtotal() for item in self.items.all())
+    
+    def get_total_with_vat(self):
+        """Retorna el total del carrito con IVA incluido"""
+        return round(self.get_total() * (1 + VAT_RATE), 2)
+    
+    def get_vat_amount(self):
+        """Retorna la cantidad total de IVA"""
+        return round(self.get_total() * VAT_RATE, 2)
+    
+    def get_items_count(self):
+        return sum(item.quantity for item in self.items.all())
+
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+    added_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('cart', 'product')
+    
+    def __str__(self):
+        return f"{self.quantity}x {self.product.name}"
+    
+    def get_subtotal(self):
+        return self.product.price * self.quantity
+    
+    def get_subtotal_with_vat(self):
+        """Retorna el subtotal del item con IVA incluido"""
+        return round(self.get_subtotal() * (1 + VAT_RATE), 2)
+    
+    def get_vat_amount(self):
+        """Retorna la cantidad de IVA de este item"""
+        return round(self.get_subtotal() * VAT_RATE, 2)
+
+
+class Order(models.Model):
+    STATUS_PAID = "paid"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_PAID, "Pagado"),
+        (STATUS_CANCELLED, "Cancelado"),
+    ]
+
+    PAYMENT_STRIPE = "stripe"
+    PAYMENT_PAYPAL = "paypal"
+    PAYMENT_MANUAL = "manual"
+    PAYMENT_CHOICES = [
+        (PAYMENT_STRIPE, "Stripe"),
+        (PAYMENT_PAYPAL, "PayPal"),
+        (PAYMENT_MANUAL, "Manual"),
+    ]
+
+    buyer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    session_key = models.CharField(max_length=40, null=True, blank=True)
+    total = models.FloatField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PAID)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default=PAYMENT_MANUAL)
+    payment_reference = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Pedido {self.id} - {self.buyer or self.session_key}"
+
+    def get_items_count(self):
+        return sum(item.quantity for item in self.items.all())
+
+
+class OrderItem(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_PROCESSING = "processing"
+    STATUS_SHIPPED = "shipped"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pendiente"),
+        (STATUS_PROCESSING, "En preparación"),
+        (STATUS_SHIPPED, "Enviado"),
+    ]
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True)
+    product_name = models.CharField(max_length=200, default="")
+    seller = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='order_items_to_fulfill')
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.FloatField(default=0)
+    total_price = models.FloatField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product_name} (Pedido {self.order_id})"
+
+
+class OrderMessage(models.Model):
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_messages')
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Mensaje de {self.sender} - {self.created_at}"
+
+
+class ShippingAddress(models.Model):
+    """Direcciones de entrega de los usuarios"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='shipping_addresses')
+    full_name = models.CharField(max_length=200, verbose_name="Nombre completo")
+    address_line_1 = models.CharField(max_length=250, verbose_name="Dirección")
+    address_line_2 = models.CharField(max_length=250, blank=True, verbose_name="Dirección (línea 2)")
+    city = models.CharField(max_length=100, verbose_name="Ciudad")
+    postal_code = models.CharField(max_length=20, verbose_name="Código postal")
+    country = models.CharField(max_length=100, default="España", verbose_name="País")
+    phone = models.CharField(max_length=20, verbose_name="Teléfono")
+    is_default = models.BooleanField(default=False, verbose_name="Dirección predeterminada")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Dirección de envío"
+        verbose_name_plural = "Direcciones de envío"
+        ordering = ['-is_default', '-created_at']
+
+    def __str__(self):
+        return f"{self.full_name} - {self.city}"
+
+    def save(self, *args, **kwargs):
+        # Si se marca como predeterminada, desmarcar las demás del usuario
+        if self.is_default:
+            ShippingAddress.objects.filter(user=self.user, is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)

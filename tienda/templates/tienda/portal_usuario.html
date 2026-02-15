@@ -1,0 +1,115 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2>Portal de Usuario</h2>
+        <p class="text-muted">Bienvenido, {{ user.first_name|default:user.username }}</p>
+    </div>
+</div>
+
+<!-- Menú de navegación del portal -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{% url 'portal_usuario' %}" class="btn btn-primary">Inicio</a>
+            <a href="{% url 'editar_perfil' %}" class="btn btn-outline-primary">Mi Perfil</a>
+            <a href="{% url 'direcciones_usuario' %}" class="btn btn-outline-primary">Direcciones</a>
+            <a href="{% url 'mensajes_comprador' %}" class="btn btn-outline-primary">Mensajes</a>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjetas de estadísticas -->
+<div class="row mt-4">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">📦 Mis Pedidos</h5>
+                <p class="display-4">{{ total_orders }}</p>
+                <p class="text-muted">pedidos realizados</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">📍 Direcciones</h5>
+                <p class="display-4">{{ total_addresses }}</p>
+                <p class="text-muted">direcciones guardadas</p>
+                <a href="{% url 'direcciones_usuario' %}" class="btn btn-sm btn-primary">Gestionar</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">✉️ Mensajes</h5>
+                <p class="display-4">{{ recent_messages|length }}</p>
+                <p class="text-muted">mensajes recientes</p>
+                <a href="{% url 'mensajes_comprador' %}" class="btn btn-sm btn-primary">Ver todos</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pedidos recientes -->
+<div class="row mt-4">
+    <div class="col-12">
+        <h4>Pedidos Recientes</h4>
+        {% if recent_orders %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Pedido #</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th>Método de Pago</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ order.total }}€</td>
+                        <td><span class="badge bg-success">{{ order.get_status_display }}</span></td>
+                        <td>{{ order.get_payment_method_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No has realizado ningún pedido todavía.</p>
+        <a href="{% url 'index' %}" class="btn btn-primary">Ir a la tienda</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Mensajes recientes -->
+{% if recent_messages %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h4>Mensajes Recientes de Vendedores</h4>
+        <div class="list-group">
+            {% for message in recent_messages %}
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ message.sender.first_name|default:message.sender.username }}</h6>
+                    <small class="text-muted">{{ message.created_at|date:"d/m/Y H:i" }}</small>
+                </div>
+                <p class="mb-1">{{ message.message|truncatewords:20 }}</p>
+                <small class="text-muted">Pedido #{{ message.order_item.order.id }}</small>
+            </div>
+            {% endfor %}
+        </div>
+        <a href="{% url 'mensajes_comprador' %}" class="btn btn-link">Ver todos los mensajes →</a>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

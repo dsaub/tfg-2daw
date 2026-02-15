@@ -1,0 +1,57 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-6 col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="text-center mb-0">Crear Cuenta</h3>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'register' %}">
+          {% csrf_token %}
+          
+          <div class="mb-3">
+            <label for="registerName" class="form-label">Nombre Completo</label>
+            <input type="text" class="form-control" id="registerName" name="name" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="registerEmail" class="form-label">Correo Electrónico</label>
+            <input type="email" class="form-control" id="registerEmail" name="email" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="registerPassword" class="form-label">Contraseña</label>
+            <input type="password" class="form-control" id="registerPassword" name="password" required>
+            <div class="form-text">La contraseña debe tener al menos 8 caracteres.</div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="registerPasswordConfirm" class="form-label">Confirmar Contraseña</label>
+            <input type="password" class="form-control" id="registerPasswordConfirm" name="password_confirm" required>
+          </div>
+          
+          <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="acceptTerms" name="terms" required>
+            <label class="form-check-label" for="acceptTerms">
+              Acepto los <a href="#" target="_blank">términos y condiciones</a>
+            </label>
+          </div>
+          
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">Crear Cuenta</button>
+          </div>
+          
+          <hr class="my-3">
+          
+          <div class="text-center">
+            <p class="mb-0">¿Ya tienes cuenta? <a href="{% url 'login' %}">Inicia sesión aquí</a></p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2>Mi Perfil</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal_usuario' %}">Portal de Usuario</a></li>
+                <li class="breadcrumb-item active">Mi Perfil</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Menú de navegación del portal -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{% url 'portal_usuario' %}" class="btn btn-outline-primary">Inicio</a>
+            <a href="{% url 'editar_perfil' %}" class="btn btn-primary">Mi Perfil</a>
+            <a href="{% url 'direcciones_usuario' %}" class="btn btn-outline-primary">Direcciones</a>
+            <a href="{% url 'mensajes_comprador' %}" class="btn btn-outline-primary">Mensajes</a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Formulario de edición de perfil -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Información Personal</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="first_name" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user.first_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="last_name" class="form-label">Apellidos</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user.last_name }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Correo Electrónico</label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nombre de Usuario</label>
+                        <input type="text" class="form-control" id="username" value="{{ user.username }}" disabled>
+                        <small class="text-muted">El nombre de usuario no se puede cambiar</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de cambio de contraseña -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Cambiar Contraseña</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{% url 'cambiar_contrasena' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Contraseña Actual</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nueva Contraseña</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        <small class="text-muted">Mínimo 8 caracteres</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nueva Contraseña</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-warning">Cambiar Contraseña</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,2 @@
+PAGE_SIZE = 20
+VAT_RATE = 0.21  # IVA 21%
