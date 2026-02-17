@@ -1,7 +1,7 @@
 {% load static %}
 {% load compress %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -102,7 +102,7 @@
                     
                     {% if user.is_authenticated %}
                         <a href="{% url 'mis_productos' %}" class="nav-link btn btn-outline-secondary btn-sm">Panel Vendedor</a>
-                        <span class="nav-text d-none d-md-inline text-muted">{{ user.first_name|default:user.username }}</span>
+                        <span class="nav-text d-none d-md-inline text-white">{{ user.first_name|default:user.username }}</span>
                         <a href="{% url 'logout' %}" class="nav-link btn btn-primary btn-sm">Cerrar Sesión</a>
                     {% else %}
                         <a href="{% url 'login' %}" class="nav-link btn btn-primary btn-sm">Iniciar Sesión</a>

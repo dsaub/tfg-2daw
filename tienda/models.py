@@ -12,6 +12,7 @@ class Category(models.Model):
 class Image(models.Model):
     name = models.CharField(max_length=200, default="")
     image = models.ImageField(upload_to='images/')
+    alt = models.CharField(max_length=255, default="", blank=True, verbose_name="Texto alternativo")
 
     def __str__(self):
         return self.name

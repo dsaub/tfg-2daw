@@ -39,7 +39,7 @@
             <tr>
                 <td>
                     {% if producto.primary_image %}
-                    <img src="{{ producto.primary_image.image.url }}" alt="{{ producto.name }}" class="rounded" style="width: 70px; height: 70px; object-fit: cover;">
+                    <img src="{{ producto.primary_image.image.url }}" alt="{{ producto.primary_image.alt|default:producto.name }}" class="rounded" style="width: 70px; height: 70px; object-fit: cover;">
                     {% else %}
                     <div class="bg-secondary d-flex align-items-center justify-content-center rounded" style="width: 70px; height: 70px;">
                         <span class="text-white small">Sin</span>
