@@ -3,5 +3,5 @@ db.sqlite3
 .venv
 .env
 logs/
-tienda/__pycache__
-proyecto/__pycache__
+tienda/__pycache__/
+proyecto/__pycache__/
