@@ -5,7 +5,7 @@ figlet Proyecto MVC
 echo "Running DB migrations..."
 python manage.py migrate
 echo "Collecting STATIC..."
-yes | python manage.py collectstatic
+python manage.py collectstatic --noinput
 
 echo "Running server!"
 
