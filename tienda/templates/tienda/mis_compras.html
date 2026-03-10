@@ -1,0 +1,63 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2>Mis Compras</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal_usuario' %}">Portal de Usuario</a></li>
+                <li class="breadcrumb-item active">Compras</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{% url 'portal_usuario' %}" class="btn btn-outline-primary">Inicio</a>
+            <a href="{% url 'mis_compras' %}" class="btn btn-primary">Compras</a>
+            <a href="{% url 'mis_recibos' %}" class="btn btn-outline-primary">Recibos</a>
+            <a href="{% url 'mensajes_comprador' %}" class="btn btn-outline-primary">Mensajes</a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <p class="text-muted">Total de compras: <strong>{{ total_orders }}</strong></p>
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Pedido #</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th>Método</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ order.total }}€</td>
+                        <td><span class="badge bg-success">{{ order.get_status_display }}</span></td>
+                        <td>{{ order.get_payment_method_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+            Aún no has realizado compras.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

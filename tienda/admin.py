@@ -1,12 +1,12 @@
 from django.contrib import admin
-from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage
+from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, User, VerificationCode
 # Register your models here.
 
 admin.site.register(Category)
 admin.site.register(Image)
 admin.site.register(Product)
-
-
+admin.site.register(User)
+admin.site.register(VerificationCode)
 class CartItemInline(admin.TabularInline):
     model = CartItem
     extra = 0

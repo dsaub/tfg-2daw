@@ -35,17 +35,27 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="city" class="form-label">Ciudad *</label>
-                            <input type="text" class="form-control" id="city" name="city" value="{{ direccion.city|default:'' }}" required>
+                            <label for="city" class="form-label">Ciudad/Pueblo (Almería) *</label>
+                            <input type="text" class="form-control" id="city" name="city" value="{{ direccion.city|default:'' }}" list="almeria-towns" autocomplete="off" required>
+                            <datalist id="almeria-towns">
+                                {% for town in almeria_municipalities %}
+                                <option value="{{ town }}"></option>
+                                {% endfor %}
+                            </datalist>
+                            <div class="form-text">Selecciona o escribe un municipio de la provincia de Almería.</div>
+                            <div class="invalid-feedback" id="city-validation-message">
+                                El pueblo/ciudad debe pertenecer a la provincia de Almería.
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="postal_code" class="form-label">Código Postal *</label>
-                            <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ direccion.postal_code|default:'' }}" required>
+                            <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ direccion.postal_code|default:'' }}" pattern="04[0-9]{3}" maxlength="5" placeholder="04XXX" required>
+                            <div class="form-text">Solo aceptamos códigos postales de Almería (04xxx).</div>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="country" class="form-label">País *</label>
-                        <input type="text" class="form-control" id="country" name="country" value="{{ direccion.country|default:'España' }}" required>
+                        <input type="text" class="form-control" id="country" name="country" value="España" readonly>
                     </div>
                     <div class="mb-3">
                         <label for="phone" class="form-label">Teléfono *</label>
@@ -66,5 +76,65 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const cityInput = document.getElementById('city');
+        const cityValidationMessage = document.getElementById('city-validation-message');
+        const form = cityInput ? cityInput.form : null;
+
+        if (!cityInput || !form) {
+            return;
+        }
+
+        const almeriaTowns = new Set([
+            {% for town in almeria_municipalities %}
+                "{{ town|escapejs }}",
+            {% endfor %}
+        ].map(normalizeTown));
+
+        function normalizeTown(value) {
+            return (value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9\s-]/g, '')
+                .replace(/-/g, ' ')
+                .toLowerCase()
+                .trim()
+                .replace(/\s+/g, ' ')
+                .replace(/^(la|los)\s+/, '');
+        }
+
+        function validateTown() {
+            const normalized = normalizeTown(cityInput.value);
+
+            if (!normalized) {
+                cityInput.setCustomValidity('');
+                cityInput.classList.remove('is-invalid');
+                return;
+            }
+
+            const isValid = almeriaTowns.has(normalized);
+
+            if (isValid) {
+                cityInput.setCustomValidity('');
+                cityInput.classList.remove('is-invalid');
+            } else {
+                cityInput.setCustomValidity('El pueblo/ciudad debe pertenecer a la provincia de Almería.');
+                cityInput.classList.add('is-invalid');
+            }
+
+            cityValidationMessage.textContent = cityInput.validationMessage || 'El pueblo/ciudad debe pertenecer a la provincia de Almería.';
+        }
+
+        cityInput.addEventListener('input', validateTown);
+        cityInput.addEventListener('blur', validateTown);
+        form.addEventListener('submit', function () {
+            validateTown();
+        });
+
+        validateTown();
+    })();
+</script>
 
 {% endblock %}

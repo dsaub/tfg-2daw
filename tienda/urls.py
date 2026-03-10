@@ -35,6 +35,8 @@ urlpatterns = [
     path("paypal/execute/", views.paypal_execute, name="paypal_execute"),
     # Portal de usuario
     path("usuario/", views.portal_usuario, name="portal_usuario"),
+    path("usuario/compras/", views.mis_compras, name="mis_compras"),
+    path("usuario/recibos/", views.mis_recibos, name="mis_recibos"),
     path("usuario/perfil/", views.editar_perfil, name="editar_perfil"),
     path("usuario/perfil/cambiar-contrasena/", views.cambiar_contrasena, name="cambiar_contrasena"),
     path("usuario/direcciones/", views.direcciones_usuario, name="direcciones_usuario"),
@@ -42,4 +44,5 @@ urlpatterns = [
     path("usuario/direcciones/<int:id>/editar/", views.editar_direccion, name="editar_direccion"),
     path("usuario/direcciones/<int:id>/eliminar/", views.eliminar_direccion, name="eliminar_direccion"),
     path("usuario/mensajes/", views.mensajes_comprador, name="mensajes_comprador"),
+    path("verify/<str:code>", views.verify, name="verify")
 ]

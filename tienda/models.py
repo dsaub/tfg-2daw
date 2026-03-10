@@ -1,6 +1,31 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AbstractUser
 from .vars import VAT_RATE
+import random, string
+class User(AbstractUser):
+    class RegisterStatus(models.TextChoices):
+        CONFIRMATION_REQUIRED = "CR", "Confirmation Required"
+        ACTIVE = "AC", "Active"
+        BANNED = "BN", "Banned"
+    
+    registration_status = models.CharField(
+        max_length = 2,
+        choices = RegisterStatus.choices,
+        default = RegisterStatus.CONFIRMATION_REQUIRED
+    )
+
+class VerificationCode(models.Model):
+    class VerificationModes(models.TextChoices):
+        VERIFY_ACCOUNT = "VA"
+        RESET_PASSWORD = "RP"
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_belongsto", null=False, blank=False)
+    code = models.TextField(default = "", unique=True)
+    code_mode = models.CharField(
+        max_length=2,
+        choices = VerificationModes.choices,
+        default = VerificationModes.VERIFY_ACCOUNT   
+    )
 
 # Create your models here.
 class Category(models.Model):
@@ -105,6 +130,7 @@ class Order(models.Model):
     ]
 
     buyer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    shipping_address = models.ForeignKey('ShippingAddress', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     session_key = models.CharField(max_length=40, null=True, blank=True)
     total = models.FloatField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PAID)

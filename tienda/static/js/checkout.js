@@ -45,6 +45,14 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Stripe initialized");
 
             button.addEventListener("click", () => {
+                const shippingAddressSelect = document.getElementById("shipping-address");
+                const selectedShippingAddress = shippingAddressSelect ? shippingAddressSelect.value : "";
+
+                if (!selectedShippingAddress) {
+                    alert("Selecciona una dirección de envío para continuar.");
+                    return;
+                }
+
                 console.log("Checkout button clicked");
                 button.disabled = true;
                 button.innerHTML = "Procesando...";
@@ -55,7 +63,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         "Content-Type": "application/json",
                         "X-CSRFToken": getCookie("csrftoken")
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({
+                        shipping_address_id: selectedShippingAddress
+                    })
                 })
                     .then((res) => {
                         console.log("Session response status:", res.status);

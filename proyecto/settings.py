@@ -10,26 +10,65 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging
+import os, sys
 from pathlib import Path
+
+
+def load_dotenv(dotenv_path: Path) -> None:
+    if not dotenv_path.exists():
+        return
+
+    for raw_line in dotenv_path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def env_list(name: str, default: list[str] | None = None) -> list[str]:
+    value = os.getenv(name)
+    if value is None:
+        return default or []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+def env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return int(value)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#g((q@lvnkt(j6)2(gvtn0px)r2r(911)pv59i(6w)5e!_-^ao'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-#g((q@lvnkt(j6)2(gvtn0px)r2r(911)pv59i(6w)5e!_-^ao')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DEBUG', True)
 
-ALLOWED_HOSTS = [
-    "192.168.1.142",
-    "localhost",
-    "127.0.0.1"
-]
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', [
+    '192.168.1.142',
+    'localhost',
+    '127.0.0.1',
+])
 
 
 # Application definition
@@ -152,7 +191,7 @@ MEDIA_ROOT = BASE_DIR / 'tienda' / 'static' / 'media'
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         }
@@ -177,11 +216,114 @@ MESSAGE_TAGS = {
 # Login URL
 LOGIN_URL = '/tienda/login/'
 
-STRIPE_PUBLISHABLE_KEY = ''
-STRIPE_SECRET_KEY = ''
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 
 # PayPal Configuration (Sandbox)
 # Para obtener credenciales: https://sandbox.paypal.com/
-PAYPAL_CLIENT_ID = ''  # Reemplazar con tu Client ID de PayPal Sandbox
-PAYPAL_CLIENT_SECRET = ''  # Reemplazar con tu Client Secret de PayPal Sandbox
-PAYPAL_MODE = 'sandbox'  # Cambiar a 'live' en producción
+PAYPAL_CLIENT_ID = os.getenv('PAYPAL_CLIENT_ID', '')  # Reemplazar con tu Client ID de PayPal Sandbox
+PAYPAL_CLIENT_SECRET = os.getenv('PAYPAL_CLIENT_SECRET', '')  # Reemplazar con tu Client Secret de PayPal Sandbox
+PAYPAL_MODE = os.getenv('PAYPAL_MODE', 'sandbox')  # Cambiar a 'live' en producción
+
+
+SMTP_ENDPOINT = os.getenv('SMTP_ENDPOINT', 'smtp.email.eu-paris-1.oci.oraclecloud.com')
+SMTP_PORT = env_int('SMTP_PORT', 587)
+SECURITY = os.getenv('SECURITY', 'tls')
+SMTP_USERNAME = os.getenv('SMTP_USERNAME', None)
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', None)
+SMTP_EMAIL = os.getenv("SMTP_EMAIL", None)
+if SMTP_USERNAME is None or SMTP_PASSWORD is None or SMTP_EMAIL is None:
+    print("Se requieren credenciales SMTP")
+    sys.exit(1)
+
+
+
+AUTH_USER_MODEL = 'tienda.User'
+
+
+DOMAIN = os.getenv("DOMAIN", "localhost")
+PROTOCOL = os.getenv("PROTOCOL", "http")
+
+
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_DIR = Path(os.getenv('LOG_DIR', BASE_DIR / 'logs'))
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / os.getenv('LOG_FILE', 'app.log')
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s | %(levelname)s | %(name)s | %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+            'level': LOG_LEVEL,
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'formatter': 'standard',
+            'filename': str(LOG_FILE),
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 5,
+            'level': LOG_LEVEL,
+            'encoding': 'utf-8',
+        },
+    },
+    'loggers': {
+        'tienda': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'tienda.audit': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'email.system': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False
+        }
+    },
+}
+
+
+logging.captureWarnings(True)
+
+
+
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = SMTP_ENDPOINT
+EMAIL_PORT = SMTP_PORT
+EMAIL_USE_TLS = (SECURITY == 'tls')  # True si SECURITY es 'tls'
+EMAIL_USE_SSL = (SECURITY == 'ssl')  # True si SECURITY es 'ssl'
+EMAIL_HOST_USER = SMTP_USERNAME
+EMAIL_HOST_PASSWORD = SMTP_PASSWORD
+
+# El correo que se usará como remitente por defecto
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", SMTP_EMAIL)
+
+# URL de Redis (asumiendo que corre en el puerto default 6379)
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+
+# Opcional: para guardar el resultado de las tareas
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+# Configuraciones adicionales recomendadas
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'

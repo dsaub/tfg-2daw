@@ -49,6 +49,30 @@
         </div>
 
         {% if cart_items %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">1) Selecciona la dirección de envío</h5>
+                {% if addresses %}
+                <div class="mb-3">
+                    <label for="shipping-address" class="form-label">Dirección</label>
+                    <select id="shipping-address" class="form-select" required>
+                        <option value="">Selecciona una dirección...</option>
+                        {% for address in addresses %}
+                        <option value="{{ address.id }}" {% if address.is_default %}selected{% endif %}>
+                            {{ address.full_name }} - {{ address.address_line_1 }}, {{ address.postal_code }} {{ address.city }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span>No tienes direcciones de envío creadas.</span>
+                    <a href="{% url 'crear_direccion' %}" class="btn btn-primary btn-sm">Crear dirección</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="table-responsive mb-4">
             <table class="table table-striped align-middle">
                 <thead>
@@ -87,20 +111,22 @@
         </div>
 
         <div class="payment-section">
-            <h3>Selecciona tu método de pago</h3>
+            <h3>2) Selecciona tu método de pago</h3>
             <div class="payment-methods">
                 <button
                     id="checkout-button"
                     class="btn btn-primary payment-btn"
                     data-config-url="/tienda/config/"
-                    data-session-url="/tienda/create-checkout-session/">
+                    data-session-url="/tienda/create-checkout-session/"
+                    {% if not addresses %}disabled{% endif %}>
                     💳 Pagar con Stripe
                 </button>
                 
                 <button
                     id="paypal-button"
                     class="btn btn-warning payment-btn"
-                    data-payment-url="{% url 'create_paypal_payment' %}">
+                    data-payment-url="{% url 'create_paypal_payment' %}"
+                    {% if not addresses %}disabled{% endif %}>
                     🅿️ Pagar con PayPal
                 </button>
             </div>
@@ -115,6 +141,13 @@
     // Manejo del botón de PayPal
     document.getElementById('paypal-button').addEventListener('click', async function(e) {
         e.preventDefault();
+
+        const shippingAddressSelect = document.getElementById('shipping-address');
+        const selectedShippingAddress = shippingAddressSelect ? shippingAddressSelect.value : '';
+        if (!selectedShippingAddress) {
+            alert('Selecciona una dirección de envío para continuar.');
+            return;
+        }
         
         const button = this;
         const originalText = button.innerHTML;
@@ -138,7 +171,8 @@
                 headers: {
                     'X-CSRFToken': csrfToken || '',
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({ shipping_address_id: selectedShippingAddress })
             });
             
             console.log('Response status:', response.status);
