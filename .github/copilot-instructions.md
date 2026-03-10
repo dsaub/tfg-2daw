@@ -39,6 +39,11 @@ Templates use Django's inheritance pattern:
 - **Access**: Media files served automatically in development via Django's static file handler
 - **Image model**: Located in [tienda/models.py](tienda/models.py) with `ImageField(upload_to='images/')`
 
+## Shipping Restrictions
+- **Zona de envío**: Solo se vende/envía dentro de la provincia de Almería
+- **País fijo**: Las direcciones deben guardarse siempre con país `España`
+- **Validación de provincia**: El código postal de envío debe ser de Almería (`04xxx`)
+
 ## Key Conventions
 1. **App registration**: Apps use `AppConfig` - see `'tienda.apps.TiendaConfig'` in `INSTALLED_APPS`
 2. **View pattern**: Function-based views in [tienda/views.py](tienda/views.py) (e.g., `index` renders template with context dict)
@@ -48,6 +53,7 @@ Templates use Django's inheritance pattern:
    - Cache key pattern: `product_{id}` (stored as `:1:product_{id}` in Redis)
    - Cache is invalidated automatically when product is edited or deleted
    - Improves performance by ~15x for product detail pages
+6. **Variables estáticas**: Las constantes y listas estáticas del proyecto deben declararse en [tienda/vars.py](tienda/vars.py) y consumirse desde ahí
 
 ## Development Workflow
 - **Python environment**: This project uses venv at `.venv/bin/python`. Always use `/home/daniel/projects/proyecto/proyecto2/proyecto/.venv/bin/python` when running Python commands
