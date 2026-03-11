@@ -76,7 +76,18 @@
     <nav class="navbar navbar-expand-md header">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
-                <img src="{% static 'img/logo.png' %}" alt="Logo" style="height: 40px;">
+                <picture>
+                    <source
+                        type="image/webp"
+                        srcset="{% static 'img/logo-40.webp' %} 1x, {% static 'img/logo-80.webp' %} 2x">
+                    <img
+                        src="{% static 'img/logo-40.png' %}"
+                        srcset="{% static 'img/logo-40.png' %} 1x, {% static 'img/logo-80.png' %} 2x"
+                        alt="Logo"
+                        width="40"
+                        height="40"
+                        decoding="async">
+                </picture>
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">

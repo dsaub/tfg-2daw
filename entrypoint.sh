@@ -1,7 +1,8 @@
 #!/bin/bash
 
 figlet Proyecto MVC
-
+echo "Sleeping due to mysql..."
+sleep 10
 echo "Running DB migrations..."
 python manage.py migrate
 echo "Collecting STATIC..."

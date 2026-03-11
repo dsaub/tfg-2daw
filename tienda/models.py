@@ -20,7 +20,7 @@ class VerificationCode(models.Model):
         RESET_PASSWORD = "RP"
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_belongsto", null=False, blank=False)
-    code = models.TextField(default = "", unique=True)
+    code = models.CharField(max_length=64, default="", unique=True)
     code_mode = models.CharField(
         max_length=2,
         choices = VerificationModes.choices,
