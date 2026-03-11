@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1
 ENV DEBIANFRONTEND=noninteractive
 WORKDIR /app
 
-RUN apt update && apt install -y build-essential figlet libpq-dev && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y build-essential figlet libpq-dev default-libmysqlclient-dev pkg-config && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt

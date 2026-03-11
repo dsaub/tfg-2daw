@@ -9,4 +9,4 @@ python manage.py collectstatic --noinput
 
 echo "Running server!"
 
-gunicorn --bind 0.0.0.0:8000 proyecto.wsgi:application
+gunicorn --bind 0.0.0.0:8000 proyecto.wsgi:application --forwarded-allow-ips="*"
