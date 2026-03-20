@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 
 from django.contrib.auth.decorators import login_required
@@ -237,7 +237,7 @@ def register(request: HttpRequest):
         )
         
 
-        tasks.enviar_correo_confirmacion.delay(user)
+        tasks.enviar_correo_confirmacion.delay(user.id)
         messages.success(request, f"¡Cuenta creada exitosamente! Por favor, verifica tu correo entrando al Link enviado.")
         return redirect("index")
     
@@ -1257,3 +1257,40 @@ def reset_password(request: HttpRequest):
 
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
+
+def reset_password(request: HttpRequest):
+    if request.method == "GET":
+        return render(request, "tienda/reset_password.html", {})
+    else:
+        tasks.enviar_correo_recuperacion.delay(request.POST["email"])
+        messages.info(request, "Si tienes una cuenta con ese correo electronico, se ha enviado un correo con un enlace")
+        return render(request, "tienda/index.html", {})
+    
+def reset_password_phase2(request: HttpRequest, code: str):
+    try:
+        ver_code = VerificationCode.objects.get(code=code)
+    except VerificationCode.DoesNotExist:
+        raise Http404()
+    
+    if ver_code.code_mode != VerificationCode.VerificationModes.RESET_PASSWORD: raise Http404()
+
+
+    if request.method == "GET":
+        return render(request, "tienda/reset_password_phase2.html", {
+            "code": code
+        })
+    elif request.method == "POST":
+        password = request.POST["password"]
+        vpassword = request.POST["verify_password"]
+        if password != vpassword:
+            messages.error(request, "Las contraseñas no coinciden")
+            return render(request, "tienda/reset_password_phase2.html", {"code": code})
+
+        user = ver_code.user
+        user.set_password(password)
+        user.save()
+        messages.success(request, "Se ha cambiado la contraseña!")
+        return redirect(reverse("index"))
+        
+    else:
+        raise Http404()
