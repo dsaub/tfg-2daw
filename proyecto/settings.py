@@ -212,7 +212,7 @@ if SASS_BINARY:
 
 # Media files (User uploads)
 MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'tienda' / 'static' / 'media'
+MEDIA_ROOT = Path(os.getenv('MEDIA_ROOT', '/app/media'))
 
 # Redis Configuration
 CACHES = {
@@ -270,6 +270,19 @@ AUTH_USER_MODEL = 'tienda.User'
 
 DOMAIN = os.getenv("DOMAIN", "localhost")
 PROTOCOL = os.getenv("PROTOCOL", "http")
+
+default_csrf_trusted_origins = []
+if DOMAIN:
+    default_csrf_trusted_origins.append(f"{PROTOCOL}://{DOMAIN}")
+
+for host in ALLOWED_HOSTS:
+    if host and host != '*':
+        default_csrf_trusted_origins.append(f"{PROTOCOL}://{host}")
+
+CSRF_TRUSTED_ORIGINS = env_list(
+    'CSRF_TRUSTED_ORIGINS',
+    list(dict.fromkeys(default_csrf_trusted_origins)),
+)
 
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()

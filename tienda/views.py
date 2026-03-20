@@ -5,16 +5,13 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, VerificationCode
-from .utilities import send_email
 from . import tasks
 from .vars import (
     PAGE_SIZE,
     VAT_RATE,
     SHIPPING_COUNTRY,
     ALMERIA_POSTAL_CODE_PREFIX,
-    ALMERIA_MUNICIPALITIES_DISPLAY,
-    verify_message,
-    login_message
+    ALMERIA_MUNICIPALITIES_DISPLAY
 )
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -239,16 +236,8 @@ def register(request: HttpRequest):
             client_ip,
         )
         
-        ver_code = ''.join(random.choices(string.digits, k=12))
 
-        codigo = VerificationCode.objects.create(
-            user = user,
-            code = ver_code,
-            code_mode = VerificationCode.VerificationModes.VERIFY_ACCOUNT
-        )
-        message = verify_message.format(name = name, protocol = settings.PROTOCOL, domain = settings.DOMAIN, code = ver_code)
-        email_result = send_email(email, "Verificación de cuenta", message)
-        
+        tasks.enviar_correo_confirmacion.delay(user)
         messages.success(request, f"¡Cuenta creada exitosamente! Por favor, verifica tu correo entrando al Link enviado.")
         return redirect("index")
     
