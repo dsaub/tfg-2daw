@@ -1,0 +1,64 @@
+{% load static %}
+{% extends "tienda/base.html" %}
+{% block content %}
+
+<div class="row">
+    <div class="col-md-12">
+        <article class="legal-container">
+            <h1>Política de Privacidad (RGPD)</h1>
+            <p>La presente Política de Privacidad establece los términos en que <strong>{{ nombre_tienda|default:"[Nombre de tu Tienda]" }}</strong> usa y protege la información proporcionada por sus usuarios en el marco de nuestro e-commerce local en Almería.</p>
+
+            <section class="legal-section">
+                <h2>1. Responsable del Tratamiento</h2>
+                <p>Los datos recabados a través de esta web son responsabilidad de:</p>
+                <address>
+                    <strong>Identidad:</strong> Comercialmeria<br>
+                    <strong>NIF/CIF:</strong> [00000000X]<br>
+                    <strong>Dirección:</strong> (Dirección de la empresa)<br>
+                    <strong>Email:</strong> <a href="mailto:info@tuweb.com">example@example.com</a>
+                </address>
+            </section>
+
+            <section class="legal-section">
+                <h2>2. Información que Recopilamos</h2>
+                <p>Para procesar pedidos y consultas en Almería y provincia, solicitamos:</p>
+                <ul>
+                    <li><strong>Datos identificativos:</strong> Nombre, apellidos y DNI (para facturación).</li>
+                    <li><strong>Contacto:</strong> Email y teléfono.</li>
+                    <li><strong>Logística:</strong> Dirección de envío en Almería o resto de España.</li>
+                </ul>
+            </section>
+
+            <section class="legal-section">
+                <h2>3. Finalidad y Legitimación</h2>
+                <p>Tratamos sus datos para:</p>
+                <ul>
+                    <li><strong>Gestión contractual:</strong> Tramitar compras y envíos (Base: Ejecución de contrato).</li>
+                    <li><strong>Atención al cliente:</strong> Responder dudas vía formulario (Base: Interés legítimo).</li>
+                    <li><strong>Newsletter:</strong> Información sobre productos locales (Base: Consentimiento explícito).</li>
+                </ul>
+            </section>
+
+            <section class="legal-section">
+                <h2>4. Conservación y Destinatarios</h2>
+                <p>Los datos se conservarán mientras dure la relación comercial y durante los plazos legales (generalmente 6 años por normativa contable). Solo se comunicarán datos a:</p>
+                <ul>
+                    <li>Agencias de transporte para la entrega del producto.</li>
+                    <li>Administración Tributaria para el cumplimiento de obligaciones fiscales.</li>
+                    <li>Entidades bancarias para el cobro de los pedidos.</li>
+                </ul>
+            </section>
+
+            <section class="legal-section">
+                <h2>5. Sus Derechos</h2>
+                <p>Como usuario, puede ejercer sus derechos de acceso, rectificación, supresión, limitación y oposición enviando un correo a <strong>[correo@tuweb.com]</strong>, adjuntando prueba de identidad.</p>
+            </section>
+
+            <footer class="legal-footer">
+                <p><small>Última actualización: Marzo 2026. Documentación para Proyecto Final DAW.</small></p>
+            </footer>
+        </article>
+    </div>
+</div>
+
+{% endblock %}

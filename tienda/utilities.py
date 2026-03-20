@@ -44,3 +44,20 @@ def send_email(dest: str, title: str, body: str):
     except Exception as e:
         logger.exception("EMAIL_SEND_FAILED to=%s subject=%s error=%s", dest, title, str(e))
         return (False, e)
+
+def send_hemail(dest: str, title: str, body: str, nbody: str):
+    try:
+        send_mail(
+            subject=title,
+            html_message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[dest],
+            fail_silently=False,
+            message=nbody
+        )
+
+        logger.info("EMAIL_SENT to=%s subject=%s", dest, title)
+        return (True,)
+    except Exception as e:
+        logger.exception("EMAIL_SEND_FAILED to=%s subject=%s error=%s", dest, title, str(e))
+        return (False, e)

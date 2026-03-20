@@ -44,5 +44,6 @@ urlpatterns = [
     path("usuario/direcciones/<int:id>/editar/", views.editar_direccion, name="editar_direccion"),
     path("usuario/direcciones/<int:id>/eliminar/", views.eliminar_direccion, name="eliminar_direccion"),
     path("usuario/mensajes/", views.mensajes_comprador, name="mensajes_comprador"),
-    path("verify/<str:code>", views.verify, name="verify")
+    path("verify/<str:code>", views.verify, name="verify"),
+    path("rgpd", views.rgpd, name="rgpd")
 ]

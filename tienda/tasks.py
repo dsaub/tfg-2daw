@@ -1,13 +1,21 @@
 from celery import shared_task
 from django.conf import settings
-from .utilities import send_email
+from django.template.loader import render_to_string
+from .utilities import send_email, send_hemail
 from .vars import login_message, verify_message
 import random, string
 
 from .models import User, VerificationCode
 @shared_task
 def enviar_correo_bienvenida(email_usuario: str, nombre_usuario: str):
-    send_email(email_usuario, "Inicio de Sesión correcto", login_message.format(name = nombre_usuario))
+    html_content = render_to_string(
+        'emails/welcome.html',
+        {
+            "name": nombre_usuario
+        },
+        using='jinja2'
+    )
+    send_hemail(email_usuario, "Inicio de Sesión correcto", html_content, "Has iniciado sesión...")
 
 @shared_task
 def enviar_correo_confirmacion(usuario: User):

@@ -1254,3 +1254,6 @@ def reset_password(request: HttpRequest):
     
         
     return render(request, "tienda/reset_password", {})
+
+def rgpd(request: HttpRequest):
+    return render(request, "tienda/rgpd.html", {})
