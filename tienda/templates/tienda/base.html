@@ -6,7 +6,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <meta name="description" content="Sitio web de comercio local Almeriense">
+    <title>Comercialmeria</title>
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 
     <noscript>
@@ -78,7 +79,7 @@
 </head>
 <body>
     {% cache 500 sidebar request.user.username %}
-    <nav class="navbar navbar-expand-md header">
+    <nav class="navbar navbar-expand-md header" role="banner">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
                 <picture>
@@ -100,7 +101,7 @@
             </button>
             
             <div class="collapse navbar-collapse" id="navbarContent">
-                <span class="navbar-text fw-semibold me-3">Comercialmeria</span>
+                <span class="navbar-text fw-semibold me-3" style="color: #ffffff">Comercialmeria</span>
                 <!-- Barra de búsqueda con sugerencias -->
                 <form class="search-suggestions-container" method="GET" action="{% url 'search' %}" role="search" id="searchForm">
                     <div class="input-group">
@@ -110,7 +111,7 @@
                     <div class="search-suggestions" id="searchSuggestions"></div>
                 </form>
                 
-                <div class="navbar-nav ms-auto d-flex align-items-md-center gap-2 flex-wrap">
+                <div class="navbar-nav ms-auto d-flex align-items-md-center gap-2 flex-wrap" role="navigation">
                     <a href="{% url 'view_cart' %}" class="nav-link position-relative btn btn-outline-primary btn-sm">
                         🛒 Carrito
                         {% if cart_count > 0 %}
@@ -134,7 +135,7 @@
     </nav>
     {% endcache %}
 
-    <div class="container-fluid">
+    <div class="container-fluid" role="main">
         <!-- Mensajes -->
         {% if messages %}
         <div class="row mt-3">
@@ -154,7 +155,7 @@
 
         {% cache 500 footer %}
         <!-- Footer-->
-        <div id="footer" class="row pt-2 pb-2 mt-5">
+        <div id="footer" class="row pt-2 pb-2 mt-5" role="contentinfo">
             <div class="col-md-12 grid">
                 <p class="text-center">Enlace 1</p>
                 <p class="text-center">Enlace 2</p>
