@@ -328,6 +328,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
 
     order_total = Decimal("0.00")
     items_with_totals = []
+    purchased_items = []
 
     for item in cart_items:
         product = item.product
@@ -338,6 +339,13 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
         )
         order_total += line_total_with_vat
         items_with_totals.append((item, unit_price_with_vat, line_total_with_vat))
+        purchased_items.append(
+            {
+                "amount": item.quantity,
+                "product_name": product.name,
+                "price": float(unit_price_with_vat),
+            }
+        )
 
     with transaction.atomic():
         order = Order.objects.create(
@@ -363,6 +371,9 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             )
 
         cart.items.all().delete()
+
+    if request.user.is_authenticated and purchased_items:
+        tasks.process_purchase.delay(request.user.id, purchased_items, payment_method)
 
     return order
 
