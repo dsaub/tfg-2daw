@@ -1,3 +1,6 @@
+import os
+from django.conf import settings
+
 from fpdf import FPDF
 import string, random
 class Recibo(FPDF):
@@ -13,8 +16,11 @@ class Recibo(FPDF):
 
 def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str):
     pdf = Recibo()
+    font_path = "/fonts/Roboto-Regular.ttf"
+    pdf.add_font('Roboto', '', '/fonts/Roboto-Regular.ttf')
+    pdf.add_font('Roboto', 'B', '/fonts/Roboto-Bold.ttf')
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.set_font('Roboto', size=12)
 
     pdf.cell(0, 10, f"Cliente: {cliente}", ln=True)
     pdf.cell(0, 10, f"")
@@ -23,7 +29,10 @@ def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str):
     DATA.append(
         ("Cant.", "Nombre", "Precio Unit.", "Subtotal")
     )
-
+    for i in objetos:
+        DATA.append(
+            (str(i["amount"]), str(i["product_name"]), str(i["price"]), str(float(i["price"])*int(i["amount"])))
+        )
     pdf.cell(0, 10, "DETALLE DEL COBRO", ln=True, align='C')
     pdf.ln(5)
 
@@ -33,7 +42,7 @@ def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str):
             for datum in data_row:
                 row.cell(datum)
     pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
+    pdf.set_font('Roboto', size=12)
     pdf.cell(0, 10, f'TOTAL A PAGAR: {total} €', align="R")
     return pdf.output(dest="S")
     
