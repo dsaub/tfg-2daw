@@ -7,7 +7,7 @@ class Recibo(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 15)
         self.cell(0, 10, "Comercialmeria S.L")
-        self.cell(0, 10, 'RECIBO DE PAGO', ln=True, align='C')
+        self.cell(0, 10, 'RECIBO DE PAGO', ln=True, align='R')
         self.ln(10)
 
     def footer(self):
