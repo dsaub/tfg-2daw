@@ -6,6 +6,7 @@ import string, random
 class Recibo(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, "Comercialmeria S.L")
         self.cell(0, 10, 'RECIBO DE PAGO', ln=True, align='C')
         self.ln(10)
 
@@ -33,7 +34,7 @@ def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str):
         DATA.append(
             (str(i["amount"]), str(i["product_name"]), str(i["price"]), str(float(i["price"])*int(i["amount"])))
         )
-    pdf.cell(0, 10, "DETALLE DEL COBRO", ln=True, align='C')
+    pdf.cell(0, 10, "DETALLE DEL COBRO", ln=True, align='R')
     pdf.ln(5)
 
     with pdf.table() as table:
