@@ -1,12 +1,18 @@
 from django.contrib import admin
-from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, User, VerificationCode
+from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode
 # Register your models here.
 
 admin.site.register(Category)
 admin.site.register(Image)
-admin.site.register(Product)
 admin.site.register(User)
 admin.site.register(VerificationCode)
+
+
+@admin.register(Product)
+class ProductAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'price', 'stock', 'category', 'creator')
+    search_fields = ('name', 'creator__username', 'creator__email')
+    list_filter = ('category',)
 class CartItemInline(admin.TabularInline):
     model = CartItem
     extra = 0
@@ -46,9 +52,9 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'buyer', 'total', 'status', 'payment_method', 'payment_reference', 'created_at')
+    list_display = ('id', 'transaction_code', 'buyer', 'total', 'status', 'payment_method', 'payment_reference', 'created_at')
     list_filter = ('status', 'payment_method', 'created_at')
-    search_fields = ('buyer__username', 'buyer__email', 'payment_reference')
+    search_fields = ('buyer__username', 'buyer__email', 'payment_reference', 'transaction_code')
     inlines = [OrderItemInline]
 
 
@@ -68,3 +74,16 @@ class OrderMessageAdmin(admin.ModelAdmin):
     def message_preview(self, obj):
         return obj.message[:50] + "..." if len(obj.message) > 50 else obj.message
     message_preview.short_description = 'Mensaje'
+
+
+class StockReservationItemInline(admin.TabularInline):
+    model = StockReservationItem
+    extra = 0
+
+
+@admin.register(StockReservation)
+class StockReservationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'session_key', 'status', 'payment_method', 'expires_at', 'created_at')
+    list_filter = ('status', 'payment_method', 'created_at')
+    search_fields = ('user__username', 'user__email', 'session_key')
+    inlines = [StockReservationItemInline]
