@@ -45,5 +45,7 @@ urlpatterns = [
     path("usuario/direcciones/<int:id>/eliminar/", views.eliminar_direccion, name="eliminar_direccion"),
     path("usuario/mensajes/", views.mensajes_comprador, name="mensajes_comprador"),
     path("verify/<str:code>", views.verify, name="verify"),
-    path("rgpd", views.rgpd, name="rgpd")
+    path("rgpd", views.rgpd, name="rgpd"),
+    path("reset-password", views.reset_password, name="reset_password"),
+    path("reset-password-phase2/<str:code>", views.reset_password_phase2, name="reset_password_phase2")
 ]

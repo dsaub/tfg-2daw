@@ -49,6 +49,23 @@
         </div>
 
         {% if cart_items %}
+        {% if stock_issues %}
+        <div class="alert alert-warning">
+            <strong>No hay stock suficiente para algunos productos:</strong>
+            <ul class="mb-0 mt-2">
+                {% for issue in stock_issues %}
+                <li>{{ issue.product_name }} - disponible: {{ issue.available }}, en carrito: {{ issue.requested }}</li>
+                {% endfor %}
+            </ul>
+            <div class="mt-2">Vuelve al carrito y ajusta las cantidades antes de pagar.</div>
+        </div>
+        {% endif %}
+
+        <div class="alert alert-info">
+            Al pulsar en pagar se reservará tu stock durante <strong>{{ reservation_minutes }} minutos</strong>.
+            Si el pago no se completa en ese tiempo, la reserva se cancelará automáticamente.
+        </div>
+
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title mb-3">1) Selecciona la dirección de envío</h5>
@@ -80,6 +97,7 @@
                         <th>Producto</th>
                         <th class="text-end">Precio (sin IVA)</th>
                         <th class="text-end">Cantidad</th>
+                        <th class="text-end">Stock actual</th>
                         <th class="text-end">Subtotal (con IVA)</th>
                     </tr>
                 </thead>
@@ -89,6 +107,7 @@
                         <td>{{ item.product.name }}</td>
                         <td class="text-end">{{ item.product.price|format_price }}€</td>
                         <td class="text-end">{{ item.quantity }}</td>
+                        <td class="text-end">{{ item.product.stock }}</td>
                         <td class="text-end">{{ item.get_subtotal_with_vat|format_price }}€</td>
                     </tr>
                     {% endfor %}
@@ -118,7 +137,7 @@
                     class="btn btn-primary payment-btn"
                     data-config-url="/tienda/config/"
                     data-session-url="/tienda/create-checkout-session/"
-                    {% if not addresses %}disabled{% endif %}>
+                    {% if not addresses or stock_issues %}disabled{% endif %}>
                     💳 Pagar con Stripe
                 </button>
                 
@@ -126,7 +145,7 @@
                     id="paypal-button"
                     class="btn btn-warning payment-btn"
                     data-payment-url="{% url 'create_paypal_payment' %}"
-                    {% if not addresses %}disabled{% endif %}>
+                    {% if not addresses or stock_issues %}disabled{% endif %}>
                     🅿️ Pagar con PayPal
                 </button>
             </div>
@@ -139,7 +158,9 @@
 
 <script>
     // Manejo del botón de PayPal
-    document.getElementById('paypal-button').addEventListener('click', async function(e) {
+    const paypalButton = document.getElementById('paypal-button');
+    if (paypalButton) {
+    paypalButton.addEventListener('click', async function(e) {
         e.preventDefault();
 
         const shippingAddressSelect = document.getElementById('shipping-address');
@@ -202,5 +223,6 @@
             button.innerHTML = originalText;
         }
     });
+    }
 </script>
 {% endblock %}

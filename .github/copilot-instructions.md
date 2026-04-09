@@ -77,6 +77,7 @@ Templates use Django's inheritance pattern:
 - Bootstrap requires JavaScript for modals/toggles (reference data-bs-* attributes in base.html)
 - SECRET_KEY is development-only (contains 'insecure' marker)
 - DEBUG=True - not production-ready
+- Search for a virtual environment in the project files, if there is one use it, if not, create it.
 
 ## When Adding Features
 - New models: Add to [tienda/models.py](tienda/models.py), run migrations, register in [tienda/admin.py](tienda/admin.py)

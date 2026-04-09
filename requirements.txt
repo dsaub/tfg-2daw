@@ -43,3 +43,4 @@ vine==5.1.0
 wcwidth==0.6.0
 whitenoise==6.12.0
 mysqlclient
+fpdf2==2.8.7

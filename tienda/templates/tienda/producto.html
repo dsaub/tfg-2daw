@@ -39,14 +39,21 @@
         <div id="descripcion">
             {{ product.briefdesc }}
         </div>
+        <div class="mt-3">
+            {% if product.stock > 0 %}
+            <span class="badge bg-success">Stock disponible: {{ product.stock }}</span>
+            {% else %}
+            <span class="badge bg-danger">Sin stock</span>
+            {% endif %}
+        </div>
         
         <form method="post" action="{% url 'add_to_cart' product.id %}" class="mt-4">
             {% csrf_token %}
             <div class="mb-3">
                 <label for="quantity" class="form-label">Cantidad:</label>
-                <input type="number" name="quantity" id="quantity" value="1" min="1" class="form-control" style="max-width: 100px;">
+                <input type="number" name="quantity" id="quantity" value="1" min="1" max="{{ product.stock }}" class="form-control" style="max-width: 100px;" {% if product.stock == 0 %}disabled{% endif %}>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg">🛒 Agregar al Carrito</button>
+            <button type="submit" class="btn btn-primary btn-lg" {% if product.stock == 0 %}disabled{% endif %}>🛒 Agregar al Carrito</button>
         </form>
     </div>
 </div>

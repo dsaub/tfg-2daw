@@ -14,5 +14,6 @@ COPY . /app/
 RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
-
+RUN mkdir -pv /fonts
+COPY tienda/static/fonts/ /fonts/
 CMD ["/app/entrypoint.sh"]

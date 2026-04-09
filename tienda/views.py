@@ -1,22 +1,25 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, VerificationCode
+from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode
 from . import tasks
 from .vars import (
     PAGE_SIZE,
     VAT_RATE,
     SHIPPING_COUNTRY,
     ALMERIA_POSTAL_CODE_PREFIX,
-    ALMERIA_MUNICIPALITIES_DISPLAY
+    ALMERIA_MUNICIPALITIES_DISPLAY,
+    STOCK_RESERVATION_MINUTES,
 )
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
+from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import timedelta
 import stripe
 from django.db import models, transaction
 from django.core.cache import cache
@@ -30,6 +33,8 @@ import logging
 
 logger = logging.getLogger("tienda")
 audit_logger = logging.getLogger("tienda.audit")
+STOCK_RESERVATION_SESSION_KEY = "stock_reservation_id"
+STOCK_RESERVATION_PAYMENT_SESSION_KEY = "stock_reservation_payment_method"
 
 
 def _normalize_location_text(value: str) -> str:
@@ -237,7 +242,7 @@ def register(request: HttpRequest):
         )
         
 
-        tasks.enviar_correo_confirmacion.delay(user)
+        tasks.enviar_correo_confirmacion.delay(user.id)
         messages.success(request, f"¡Cuenta creada exitosamente! Por favor, verifica tu correo entrando al Link enviado.")
         return redirect("index")
     
@@ -296,6 +301,165 @@ def get_or_create_cart(request):
     return cart
 
 
+def _get_or_create_session_key(request: HttpRequest):
+    if not request.session.session_key:
+        request.session.create()
+    return request.session.session_key
+
+
+def _get_reservation_owner_filters(request: HttpRequest):
+    if request.user.is_authenticated:
+        return {"user": request.user}
+    return {"session_key": _get_or_create_session_key(request)}
+
+
+def _release_expired_stock_reservations():
+    now = timezone.now()
+    StockReservation.objects.filter(
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__lte=now,
+    ).update(status=StockReservation.STATUS_EXPIRED)
+
+
+def _clear_stock_reservation_session(request: HttpRequest):
+    request.session.pop(STOCK_RESERVATION_SESSION_KEY, None)
+    request.session.pop(STOCK_RESERVATION_PAYMENT_SESSION_KEY, None)
+
+
+def _cancel_active_stock_reservations_for_request(request: HttpRequest):
+    _release_expired_stock_reservations()
+    StockReservation.objects.filter(
+        **_get_reservation_owner_filters(request),
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__gt=timezone.now(),
+    ).update(status=StockReservation.STATUS_CANCELLED)
+
+
+def _get_reserved_quantities_by_product(product_ids, exclude_reservation_ids=None):
+    if not product_ids:
+        return {}
+
+    reserved_qs = StockReservationItem.objects.filter(
+        product_id__in=product_ids,
+        reservation__status=StockReservation.STATUS_ACTIVE,
+        reservation__expires_at__gt=timezone.now(),
+    )
+    if exclude_reservation_ids:
+        reserved_qs = reserved_qs.exclude(reservation_id__in=exclude_reservation_ids)
+
+    reserved_totals = reserved_qs.values("product_id").annotate(total_reserved=models.Sum("quantity"))
+    return {row["product_id"]: row["total_reserved"] for row in reserved_totals}
+
+
+def _get_active_reservation_ids_for_request(request: HttpRequest):
+    _release_expired_stock_reservations()
+    return list(
+        StockReservation.objects.filter(
+            **_get_reservation_owner_filters(request),
+            status=StockReservation.STATUS_ACTIVE,
+            expires_at__gt=timezone.now(),
+        ).values_list("id", flat=True)
+    )
+
+
+def _get_available_stock_by_product(product_ids, exclude_reservation_ids=None):
+    _release_expired_stock_reservations()
+    products = Product.objects.filter(id__in=product_ids)
+    stocks = {product.id: product.stock for product in products}
+    reserved = _get_reserved_quantities_by_product(product_ids, exclude_reservation_ids=exclude_reservation_ids)
+    return {
+        product_id: max(stocks.get(product_id, 0) - reserved.get(product_id, 0), 0)
+        for product_id in product_ids
+    }
+
+
+def _get_cart_stock_issues(cart_items, exclude_reservation_ids=None):
+    product_ids = [item.product_id for item in cart_items]
+    available_by_product = _get_available_stock_by_product(product_ids, exclude_reservation_ids=exclude_reservation_ids)
+
+    issues = []
+    for item in cart_items:
+        available = available_by_product.get(item.product_id, 0)
+        if item.quantity > available:
+            issues.append({
+                "product_name": item.product.name,
+                "requested": item.quantity,
+                "available": available,
+            })
+    return issues
+
+
+def _build_stock_issue_message(issue):
+    return (
+        f"No hay stock suficiente de '{issue['product_name']}'. "
+        f"Disponible: {issue['available']}, solicitado: {issue['requested']}."
+    )
+
+
+def _create_stock_reservation_for_cart(request: HttpRequest, cart_items, payment_method: str):
+    if not cart_items:
+        return None, ["El carrito está vacío."]
+
+    _release_expired_stock_reservations()
+
+    with transaction.atomic():
+        StockReservation.objects.select_for_update().filter(
+            **_get_reservation_owner_filters(request),
+            status=StockReservation.STATUS_ACTIVE,
+            expires_at__gt=timezone.now(),
+        ).update(status=StockReservation.STATUS_CANCELLED)
+
+        product_ids = [item.product_id for item in cart_items]
+        products = Product.objects.select_for_update().filter(id__in=product_ids)
+        product_stock = {product.id: product.stock for product in products}
+        reserved = _get_reserved_quantities_by_product(product_ids)
+
+        issues = []
+        for item in cart_items:
+            available = max(product_stock.get(item.product_id, 0) - reserved.get(item.product_id, 0), 0)
+            if item.quantity > available:
+                issues.append(_build_stock_issue_message({
+                    "product_name": item.product.name,
+                    "requested": item.quantity,
+                    "available": available,
+                }))
+
+        if issues:
+            return None, issues
+
+        reservation = StockReservation.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            session_key=None if request.user.is_authenticated else _get_or_create_session_key(request),
+            payment_method=payment_method,
+            expires_at=timezone.now() + timedelta(minutes=STOCK_RESERVATION_MINUTES),
+        )
+        StockReservationItem.objects.bulk_create([
+            StockReservationItem(
+                reservation=reservation,
+                product=item.product,
+                quantity=item.quantity,
+            )
+            for item in cart_items
+        ])
+
+    return reservation, []
+
+
+def _get_session_stock_reservation(request: HttpRequest, payment_method: str):
+    reservation_id = request.session.get(STOCK_RESERVATION_SESSION_KEY)
+    reservation_payment_method = request.session.get(STOCK_RESERVATION_PAYMENT_SESSION_KEY)
+    if not reservation_id or reservation_payment_method != payment_method:
+        return None
+
+    return StockReservation.objects.filter(
+        id=reservation_id,
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__gt=timezone.now(),
+        payment_method=payment_method,
+        **_get_reservation_owner_filters(request),
+    ).first()
+
+
 def _get_selected_shipping_address(request: HttpRequest):
     """Obtiene la dirección seleccionada desde JSON o form-data y valida pertenencia al usuario."""
     shipping_address_id = request.POST.get("shipping_address_id")
@@ -318,16 +482,17 @@ def _get_selected_shipping_address(request: HttpRequest):
     return ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
 
 
-def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None):
-    """Crea un pedido a partir del carrito actual y lo asigna a vendedores."""
+def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None, stock_reservation=None):
+    """Crea un pedido a partir del carrito actual, validando y descontando stock."""
     cart = get_or_create_cart(request)
     cart_items = list(cart.items.select_related("product", "product__creator"))
 
     if not cart_items:
-        return None
+        return None, "El carrito está vacío."
 
     order_total = Decimal("0.00")
     items_with_totals = []
+    purchased_items = []
 
     for item in cart_items:
         product = item.product
@@ -338,8 +503,70 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
         )
         order_total += line_total_with_vat
         items_with_totals.append((item, unit_price_with_vat, line_total_with_vat))
+        purchased_items.append(
+            {
+                "amount": item.quantity,
+                "product_name": product.name,
+                "price": float(unit_price_with_vat),
+            }
+        )
+
+    _release_expired_stock_reservations()
 
     with transaction.atomic():
+        locked_reservation = None
+        reserved_by_product = {}
+
+        if stock_reservation is not None:
+            locked_reservation = StockReservation.objects.select_for_update().filter(
+                id=stock_reservation.id,
+                status=StockReservation.STATUS_ACTIVE,
+                expires_at__gt=timezone.now(),
+            ).first()
+            if locked_reservation is None:
+                return None, (
+                    f"La reserva de stock ha caducado. Tienes {STOCK_RESERVATION_MINUTES} minutos "
+                    "desde que pulsas pagar. Revisa el carrito y vuelve a intentarlo."
+                )
+
+            for reservation_item in locked_reservation.items.all():
+                reserved_by_product[reservation_item.product_id] = reservation_item.quantity
+
+        product_ids = [item.product_id for item in cart_items]
+        products = Product.objects.select_for_update().filter(id__in=product_ids)
+        product_map = {product.id: product for product in products}
+
+        reserved_from_others = _get_reserved_quantities_by_product(
+            product_ids,
+            exclude_reservation_ids=[locked_reservation.id] if locked_reservation else None,
+        )
+
+        for item in cart_items:
+            product = product_map.get(item.product_id)
+            if product is None:
+                return None, f"El producto '{item.product.name}' ya no está disponible."
+
+            if locked_reservation is not None and item.quantity > reserved_by_product.get(item.product_id, 0):
+                return None, (
+                    f"La cantidad de '{item.product.name}' ha cambiado desde la reserva. "
+                    "Vuelve a intentar el pago."
+                )
+
+            available = max(product.stock - reserved_from_others.get(item.product_id, 0), 0)
+            if item.quantity > available:
+                return None, _build_stock_issue_message({
+                    "product_name": item.product.name,
+                    "requested": item.quantity,
+                    "available": available,
+                })
+
+            if product.stock < item.quantity:
+                return None, _build_stock_issue_message({
+                    "product_name": item.product.name,
+                    "requested": item.quantity,
+                    "available": product.stock,
+                })
+
         order = Order.objects.create(
             buyer=request.user if request.user.is_authenticated else None,
             shipping_address=shipping_address,
@@ -362,9 +589,25 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
                 total_price=float(line_total_with_vat),
             )
 
+            product_row = product_map.get(item.product_id)
+            product_row.stock -= item.quantity
+            product_row.save(update_fields=["stock"])
+
         cart.items.all().delete()
 
-    return order
+        if locked_reservation is not None:
+            locked_reservation.status = StockReservation.STATUS_COMPLETED
+            locked_reservation.save(update_fields=["status", "updated_at"])
+
+    if request.user.is_authenticated and purchased_items:
+        tasks.process_purchase.delay(
+            request.user.id,
+            purchased_items,
+            payment_method,
+            order.transaction_code,
+        )
+
+    return order, ""
 
 
 def add_to_cart(request: HttpRequest, product_id: int):
@@ -372,9 +615,25 @@ def add_to_cart(request: HttpRequest, product_id: int):
     try:
         product = Product.objects.get(id=product_id)
         cart = get_or_create_cart(request)
+
+        _cancel_active_stock_reservations_for_request(request)
+        _clear_stock_reservation_session(request)
         
         # Obtener cantidad del POST o por defecto 1
         quantity = int(request.POST.get('quantity', 1))
+        if quantity <= 0:
+            messages.error(request, "La cantidad debe ser mayor que cero.")
+            return redirect('producto', id=product_id)
+
+        existing_item = CartItem.objects.filter(cart=cart, product=product).first()
+        desired_quantity = quantity if existing_item is None else existing_item.quantity + quantity
+        available = _get_available_stock_by_product([product.id]).get(product.id, 0)
+        if desired_quantity > available:
+            messages.error(
+                request,
+                f"No hay stock suficiente de '{product.name}'. Disponible: {available}, solicitado: {desired_quantity}.",
+            )
+            return redirect('producto', id=product_id)
         
         # Buscar si ya existe el producto en el carrito
         cart_item, created = CartItem.objects.get_or_create(
@@ -400,6 +659,10 @@ def add_to_cart(request: HttpRequest, product_id: int):
             })
         
         return redirect('view_cart')
+
+    except ValueError:
+        messages.error(request, "Cantidad no válida.")
+        return redirect('producto', id=product_id)
     
     except Product.DoesNotExist:
         messages.error(request, "Producto no encontrado.")
@@ -409,9 +672,13 @@ def add_to_cart(request: HttpRequest, product_id: int):
 def view_cart(request: HttpRequest):
     """Muestra el contenido del carrito"""
     cart = get_or_create_cart(request)
+    cart_items = list(cart.items.select_related("product"))
+    active_reservation_ids = _get_active_reservation_ids_for_request(request)
+    stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
     return render(request, "tienda/cart.html", {
         "cart": cart,
-        "cart_items": cart.items.all()
+        "cart_items": cart_items,
+        "stock_issues": stock_issues,
     })
 
 
@@ -420,10 +687,21 @@ def update_cart_item(request: HttpRequest, item_id: int):
     try:
         cart = get_or_create_cart(request)
         cart_item = CartItem.objects.get(id=item_id, cart=cart)
+
+        _cancel_active_stock_reservations_for_request(request)
+        _clear_stock_reservation_session(request)
         
         quantity = int(request.POST.get('quantity', 1))
         
         if quantity > 0:
+            available = _get_available_stock_by_product([cart_item.product_id]).get(cart_item.product_id, 0)
+            if quantity > available:
+                messages.error(
+                    request,
+                    f"No hay stock suficiente de '{cart_item.product.name}'. Disponible: {available}, solicitado: {quantity}.",
+                )
+                return redirect('view_cart')
+
             cart_item.quantity = quantity
             cart_item.save()
             messages.success(request, "Cantidad actualizada.")
@@ -436,12 +714,17 @@ def update_cart_item(request: HttpRequest, item_id: int):
     except CartItem.DoesNotExist:
         messages.error(request, "Producto no encontrado en el carrito.")
         return redirect('view_cart')
+    except ValueError:
+        messages.error(request, "Cantidad no válida.")
+        return redirect('view_cart')
 
 
 def remove_from_cart(request: HttpRequest, item_id: int):
     """Elimina un producto del carrito"""
     try:
         cart = get_or_create_cart(request)
+        _cancel_active_stock_reservations_for_request(request)
+        _clear_stock_reservation_session(request)
         cart_item = CartItem.objects.get(id=item_id, cart=cart)
         product_name = cart_item.product.name
         cart_item.delete()
@@ -456,6 +739,8 @@ def remove_from_cart(request: HttpRequest, item_id: int):
 def clear_cart(request: HttpRequest):
     """Vacía todo el carrito"""
     cart = get_or_create_cart(request)
+    _cancel_active_stock_reservations_for_request(request)
+    _clear_stock_reservation_session(request)
     cart.items.all().delete()
     messages.success(request, "Carrito vaciado.")
     return redirect('view_cart')
@@ -537,12 +822,13 @@ def crear_producto(request: HttpRequest):
         briefdesc = request.POST.get("briefdesc")
         description = request.POST.get("description")
         price = request.POST.get("price")
+        stock = request.POST.get("stock")
         category_id = request.POST.get("category")
         primary_image_file = request.FILES.get("primary_image")
         secondary_images_files = request.FILES.getlist("secondary_images")
         
         # Validaciones
-        if not all([name, description, price, category_id]):
+        if not all([name, description, price, stock, category_id]):
             messages.error(request, "Por favor completa todos los campos obligatorios.")
             categories = Category.objects.all()
             return render(request, "tienda/crear_producto.html", {"categories": categories})
@@ -553,6 +839,15 @@ def crear_producto(request: HttpRequest):
                 raise ValueError("El precio no puede ser negativo")
         except ValueError:
             messages.error(request, "El precio debe ser un número válido.")
+            categories = Category.objects.all()
+            return render(request, "tienda/crear_producto.html", {"categories": categories})
+
+        try:
+            stock = int(stock)
+            if stock < 0:
+                raise ValueError("El stock no puede ser negativo")
+        except ValueError:
+            messages.error(request, "El stock debe ser un número entero válido.")
             categories = Category.objects.all()
             return render(request, "tienda/crear_producto.html", {"categories": categories})
         
@@ -577,6 +872,7 @@ def crear_producto(request: HttpRequest):
             briefdesc=briefdesc or "",
             description=description,
             price=price,
+            stock=stock,
             category=category,
             primary_image=primary_image,
             creator=request.user
@@ -609,11 +905,12 @@ def editar_producto(request: HttpRequest, id: int):
         briefdesc = request.POST.get("briefdesc")
         description = request.POST.get("description")
         price = request.POST.get("price")
+        stock = request.POST.get("stock")
         category_id = request.POST.get("category")
         primary_image_file = request.FILES.get("primary_image")
         secondary_images_files = request.FILES.getlist("secondary_images")
 
-        if not all([name, description, price, category_id]):
+        if not all([name, description, price, stock, category_id]):
             messages.error(request, "Por favor completa todos los campos obligatorios.")
             categories = Category.objects.all()
             return render(request, "tienda/editar_producto.html", {
@@ -634,6 +931,18 @@ def editar_producto(request: HttpRequest, id: int):
             })
 
         try:
+            stock = int(stock)
+            if stock < 0:
+                raise ValueError("El stock no puede ser negativo")
+        except ValueError:
+            messages.error(request, "El stock debe ser un número entero válido.")
+            categories = Category.objects.all()
+            return render(request, "tienda/editar_producto.html", {
+                "categories": categories,
+                "producto": producto
+            })
+
+        try:
             category = Category.objects.get(id=category_id)
         except Category.DoesNotExist:
             messages.error(request, "Categoría no válida.")
@@ -647,6 +956,7 @@ def editar_producto(request: HttpRequest, id: int):
         producto.briefdesc = briefdesc or ""
         producto.description = description
         producto.price = price
+        producto.stock = stock
         producto.category = category
 
         if primary_image_file:
@@ -693,12 +1003,16 @@ def borrar_producto(request: HttpRequest, id: int):
 @login_required
 def checkout(request: HttpRequest):
     cart = get_or_create_cart(request)
-    cart_items = cart.items.select_related("product")
+    cart_items = list(cart.items.select_related("product"))
+    active_reservation_ids = _get_active_reservation_ids_for_request(request)
+    stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
     addresses = ShippingAddress.objects.filter(user=request.user)
     return render(request, "tienda/checkout.html", {
         "cart": cart,
         "cart_items": cart_items,
         "addresses": addresses,
+        "stock_issues": stock_issues,
+        "reservation_minutes": STOCK_RESERVATION_MINUTES,
     })
 
 @csrf_exempt
@@ -722,10 +1036,23 @@ def create_checkout_session(request: HttpRequest):
             return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
 
         cart = get_or_create_cart(request)
-        cart_items = cart.items.select_related("product")
+        cart_items = list(cart.items.select_related("product"))
 
-        if not cart_items.exists():
+        if not cart_items:
             return JsonResponse({"error": "El carrito está vacío"}, status=400)
+
+        active_reservation_ids = _get_active_reservation_ids_for_request(request)
+        stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
+        if stock_issues:
+            return JsonResponse({"error": _build_stock_issue_message(stock_issues[0])}, status=400)
+
+        reservation, reservation_issues = _create_stock_reservation_for_cart(
+            request,
+            cart_items,
+            StockReservation.PAYMENT_STRIPE,
+        )
+        if reservation is None:
+            return JsonResponse({"error": reservation_issues[0]}, status=400)
 
         stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -763,6 +1090,8 @@ def create_checkout_session(request: HttpRequest):
 
         request.session['stripe_session_id'] = session.id
         request.session['selected_shipping_address_id'] = shipping_address.id
+        request.session[STOCK_RESERVATION_SESSION_KEY] = reservation.id
+        request.session[STOCK_RESERVATION_PAYMENT_SESSION_KEY] = StockReservation.PAYMENT_STRIPE
 
         return JsonResponse({"sessionId": session.id})
     except Exception as e:
@@ -770,20 +1099,37 @@ def create_checkout_session(request: HttpRequest):
         return JsonResponse({"error": f"Error al crear sesión de pago: {str(e)}"}, status=500)
 
 
+@login_required
 def checkout_success(request: HttpRequest):
     payment_reference = request.session.get('stripe_session_id', "")
     shipping_address_id = request.session.get('selected_shipping_address_id')
     shipping_address = ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
-    create_order_from_cart(request, Order.PAYMENT_STRIPE, payment_reference, shipping_address)
+    reservation = _get_session_stock_reservation(request, StockReservation.PAYMENT_STRIPE)
+    order, order_error = create_order_from_cart(
+        request,
+        Order.PAYMENT_STRIPE,
+        payment_reference,
+        shipping_address,
+        stock_reservation=reservation,
+    )
+
+    if order is None:
+        messages.error(request, order_error)
+        return redirect("checkout")
+
     if 'stripe_session_id' in request.session:
         del request.session['stripe_session_id']
     if 'selected_shipping_address_id' in request.session:
         del request.session['selected_shipping_address_id']
+    _clear_stock_reservation_session(request)
     messages.success(request, "Pago realizado correctamente. ¡Gracias por tu compra!")
-    return render(request, "tienda/checkout_success.html", {})
+    return render(request, "tienda/checkout_success.html", {"order": order})
 
 
+@login_required
 def checkout_cancel(request: HttpRequest):
+    _cancel_active_stock_reservations_for_request(request)
+    _clear_stock_reservation_session(request)
     messages.info(request, "Pago cancelado. Puedes intentarlo de nuevo cuando quieras.")
     return render(request, "tienda/checkout_cancel.html", {})
 
@@ -825,10 +1171,23 @@ def create_paypal_payment(request: HttpRequest):
         import paypalrestsdk
         
         cart = get_or_create_cart(request)
-        cart_items = cart.items.select_related("product")
+        cart_items = list(cart.items.select_related("product"))
 
-        if not cart_items.exists():
+        if not cart_items:
             return JsonResponse({"error": "El carrito está vacío"}, status=400)
+
+        active_reservation_ids = _get_active_reservation_ids_for_request(request)
+        stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
+        if stock_issues:
+            return JsonResponse({"error": _build_stock_issue_message(stock_issues[0])}, status=400)
+
+        reservation, reservation_issues = _create_stock_reservation_for_cart(
+            request,
+            cart_items,
+            StockReservation.PAYMENT_PAYPAL,
+        )
+        if reservation is None:
+            return JsonResponse({"error": reservation_issues[0]}, status=400)
 
         # Configurar PayPal
         paypalrestsdk.configure({
@@ -892,6 +1251,8 @@ def create_paypal_payment(request: HttpRequest):
             # Guardar el payment ID en sesión
             request.session['paypal_payment_id'] = payment.id
             request.session['selected_shipping_address_id'] = shipping_address.id
+            request.session[STOCK_RESERVATION_SESSION_KEY] = reservation.id
+            request.session[STOCK_RESERVATION_PAYMENT_SESSION_KEY] = StockReservation.PAYMENT_PAYPAL
             
             # Encontrar el link de aprobación
             for link in payment.links:
@@ -946,16 +1307,28 @@ def paypal_execute(request: HttpRequest):
             # Pago exitoso - crear pedido y limpiar el carrito
             shipping_address_id = request.session.get('selected_shipping_address_id')
             shipping_address = ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
-            create_order_from_cart(request, Order.PAYMENT_PAYPAL, payment_id, shipping_address)
+            reservation = _get_session_stock_reservation(request, StockReservation.PAYMENT_PAYPAL)
+            order, order_error = create_order_from_cart(
+                request,
+                Order.PAYMENT_PAYPAL,
+                payment_id,
+                shipping_address,
+                stock_reservation=reservation,
+            )
+
+            if order is None:
+                messages.error(request, order_error)
+                return redirect("checkout")
             
             # Limpiar la sesión
             if 'paypal_payment_id' in request.session:
                 del request.session['paypal_payment_id']
             if 'selected_shipping_address_id' in request.session:
                 del request.session['selected_shipping_address_id']
+            _clear_stock_reservation_session(request)
 
             messages.success(request, "¡Pago realizado correctamente con PayPal! Gracias por tu compra.")
-            return render(request, "tienda/checkout_success.html", {})
+            return render(request, "tienda/checkout_success.html", {"order": order})
         else:
             error_message = payment.error.get("message", "Error desconocido")
             messages.error(request, f"Error al procesar el pago: {error_message}")
@@ -965,6 +1338,8 @@ def paypal_execute(request: HttpRequest):
         logger.exception("PAYPAL_EXECUTE_EXCEPTION user_id=%s error=%s", request.user.id, str(e))
         messages.error(request, f"Error: {str(e)}")
         return redirect("checkout")
+
+
 def search_suggestions(request: HttpRequest):
     """API AJAX que retorna sugerencias de búsqueda en JSON"""
     query = request.GET.get('q', '').strip()
@@ -1257,3 +1632,40 @@ def reset_password(request: HttpRequest):
 
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
+
+def reset_password(request: HttpRequest):
+    if request.method == "GET":
+        return render(request, "tienda/reset_password.html", {})
+    else:
+        tasks.enviar_correo_recuperacion.delay(request.POST["email"])
+        messages.info(request, "Si tienes una cuenta con ese correo electronico, se ha enviado un correo con un enlace")
+        return render(request, "tienda/index.html", {})
+    
+def reset_password_phase2(request: HttpRequest, code: str):
+    try:
+        ver_code = VerificationCode.objects.get(code=code)
+    except VerificationCode.DoesNotExist:
+        raise Http404()
+    
+    if ver_code.code_mode != VerificationCode.VerificationModes.RESET_PASSWORD: raise Http404()
+
+
+    if request.method == "GET":
+        return render(request, "tienda/reset_password_phase2.html", {
+            "code": code
+        })
+    elif request.method == "POST":
+        password = request.POST["password"]
+        vpassword = request.POST["verify_password"]
+        if password != vpassword:
+            messages.error(request, "Las contraseñas no coinciden")
+            return render(request, "tienda/reset_password_phase2.html", {"code": code})
+
+        user = ver_code.user
+        user.set_password(password)
+        user.save()
+        messages.success(request, "Se ha cambiado la contraseña!")
+        return redirect(reverse("index"))
+        
+    else:
+        raise Http404()

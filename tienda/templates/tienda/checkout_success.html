@@ -7,6 +7,9 @@
         <div class="alert alert-success p-5">
             <h2 class="mb-3">¡Pago completado!</h2>
             <p class="mb-4">Tu pedido ha sido procesado correctamente.</p>
+            {% if order and order.transaction_code %}
+            <p class="mb-4"><strong>ID de transacción:</strong> {{ order.transaction_code }}</p>
+            {% endif %}
             <a href="{% url 'index' %}" class="btn btn-primary">Volver a la tienda</a>
         </div>
     </div>
