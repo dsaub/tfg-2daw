@@ -442,6 +442,8 @@ def _create_stock_reservation_for_cart(request: HttpRequest, cart_items, payment
             for item in cart_items
         ])
 
+    cache.delete_many([f"product_{product_id}" for product_id in product_ids])
+
     return reservation, []
 
 
@@ -592,6 +594,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             product_row = product_map.get(item.product_id)
             product_row.stock -= item.quantity
             product_row.save(update_fields=["stock"])
+            cache.delete(f"product_{product_row.id}")
 
         cart.items.all().delete()
 
@@ -967,6 +970,7 @@ def editar_producto(request: HttpRequest, id: int):
             producto.primary_image = primary_image
 
         producto.save()
+        cache.delete(f"product_{producto.id}")
 
         if secondary_images_files:
             producto.secondary_images.clear()
@@ -996,6 +1000,7 @@ def borrar_producto(request: HttpRequest, id: int):
 
     producto = get_object_or_404(Product, id=id, creator=request.user)
     nombre = producto.name
+    cache.delete(f"product_{producto.id}")
     producto.delete()
     messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
     return redirect("mis_productos")
