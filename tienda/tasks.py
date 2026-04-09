@@ -57,12 +57,18 @@ def enviar_correo_recuperacion(email: str):
 
 # Purchased items should be a list of dictionary, the dictionary must follow this tags: amount, product name, price (each)
 @shared_task
-def process_purchase(user_id: int, purchased_items: list, payment_method: str):
+def process_purchase(user_id: int, purchased_items: list, payment_method: str, transaction_code: str):
     user = User.objects.get(id=user_id)
     total = 0
     for i in purchased_items:
         total += i["price"]*i["amount"]
-    pdf_data = pdf.generar_recibo(user.get_full_name(), total, purchased_items, payment_method)
+    pdf_data = pdf.generar_recibo(
+        user.get_full_name(),
+        total,
+        purchased_items,
+        payment_method,
+        transaction_code,
+    )
     
     email = EmailMessage(
         subject="Tu recibo de compra",

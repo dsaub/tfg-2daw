@@ -15,7 +15,7 @@ class Recibo(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Pagina {self.page_no()}', align='C')
 
-def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str):
+def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str, transaction_code: str):
     pdf = Recibo()
     font_path = "/fonts/Roboto-Regular.ttf"
     pdf.add_font('Roboto', '', '/fonts/Roboto-Regular.ttf')
@@ -24,6 +24,7 @@ def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str):
     pdf.set_font('Roboto', size=12)
 
     pdf.cell(0, 10, f"Cliente: {cliente}", ln=True)
+    pdf.cell(0, 10, f"ID de transaccion: {transaction_code}", ln=True)
     pdf.cell(0, 10, f"")
 
     DATA = []

@@ -34,6 +34,7 @@
                 <thead>
                     <tr>
                         <th>Recibo #</th>
+                        <th>ID Transacción</th>
                         <th>Fecha</th>
                         <th>Total</th>
                         <th>Método</th>
@@ -44,6 +45,7 @@
                     {% for receipt in receipts %}
                     <tr>
                         <td>{{ receipt.id }}</td>
+                        <td>{{ receipt.transaction_code|default:"-" }}</td>
                         <td>{{ receipt.created_at|date:"d/m/Y H:i" }}</td>
                         <td>{{ receipt.total }}€</td>
                         <td>{{ receipt.get_payment_method_display }}</td>

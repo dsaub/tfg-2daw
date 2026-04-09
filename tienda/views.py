@@ -4,19 +4,22 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, VerificationCode
+from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode
 from . import tasks
 from .vars import (
     PAGE_SIZE,
     VAT_RATE,
     SHIPPING_COUNTRY,
     ALMERIA_POSTAL_CODE_PREFIX,
-    ALMERIA_MUNICIPALITIES_DISPLAY
+    ALMERIA_MUNICIPALITIES_DISPLAY,
+    STOCK_RESERVATION_MINUTES,
 )
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
+from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import timedelta
 import stripe
 from django.db import models, transaction
 from django.core.cache import cache
@@ -373,7 +376,12 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
         cart.items.all().delete()
 
     if request.user.is_authenticated and purchased_items:
-        tasks.process_purchase.delay(request.user.id, purchased_items, payment_method)
+        tasks.process_purchase.delay(
+            request.user.id,
+            purchased_items,
+            payment_method,
+            order.transaction_code,
+        )
 
     return order
 
@@ -785,13 +793,13 @@ def checkout_success(request: HttpRequest):
     payment_reference = request.session.get('stripe_session_id', "")
     shipping_address_id = request.session.get('selected_shipping_address_id')
     shipping_address = ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
-    create_order_from_cart(request, Order.PAYMENT_STRIPE, payment_reference, shipping_address)
+    order = create_order_from_cart(request, Order.PAYMENT_STRIPE, payment_reference, shipping_address)
     if 'stripe_session_id' in request.session:
         del request.session['stripe_session_id']
     if 'selected_shipping_address_id' in request.session:
         del request.session['selected_shipping_address_id']
     messages.success(request, "Pago realizado correctamente. ¡Gracias por tu compra!")
-    return render(request, "tienda/checkout_success.html", {})
+    return render(request, "tienda/checkout_success.html", {"order": order})
 
 
 def checkout_cancel(request: HttpRequest):
@@ -957,7 +965,7 @@ def paypal_execute(request: HttpRequest):
             # Pago exitoso - crear pedido y limpiar el carrito
             shipping_address_id = request.session.get('selected_shipping_address_id')
             shipping_address = ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
-            create_order_from_cart(request, Order.PAYMENT_PAYPAL, payment_id, shipping_address)
+            order = create_order_from_cart(request, Order.PAYMENT_PAYPAL, payment_id, shipping_address)
             
             # Limpiar la sesión
             if 'paypal_payment_id' in request.session:
@@ -966,7 +974,7 @@ def paypal_execute(request: HttpRequest):
                 del request.session['selected_shipping_address_id']
 
             messages.success(request, "¡Pago realizado correctamente con PayPal! Gracias por tu compra.")
-            return render(request, "tienda/checkout_success.html", {})
+            return render(request, "tienda/checkout_success.html", {"order": order})
         else:
             error_message = payment.error.get("message", "Error desconocido")
             messages.error(request, f"Error al procesar el pago: {error_message}")
