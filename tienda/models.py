@@ -1,7 +1,17 @@
 from django.db import models
 from django.contrib.auth.models import User, AbstractUser
-from .vars import VAT_RATE
+from django.utils.crypto import get_random_string
+from .vars import VAT_RATE, TRANSACTION_CODE_PREFIX, TRANSACTION_CODE_LENGTH, TRANSACTION_CODE_ALPHABET
 import random, string
+
+
+def generate_transaction_code() -> str:
+    while True:
+        code = f"{TRANSACTION_CODE_PREFIX}{get_random_string(TRANSACTION_CODE_LENGTH, TRANSACTION_CODE_ALPHABET)}"
+        if not Order.objects.filter(transaction_code=code).exists():
+            return code
+
+
 class User(AbstractUser):
     class RegisterStatus(models.TextChoices):
         CONFIRMATION_REQUIRED = "CR", "Confirmation Required"
@@ -47,6 +57,7 @@ class Product(models.Model):
     description = models.TextField(default = "")
     briefdesc = models.TextField(default = "")
     price = models.FloatField(default = 0)
+    stock = models.PositiveIntegerField(default=0)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     primary_image = models.ForeignKey(Image, on_delete=models.SET_NULL, null=True)
     secondary_images = models.ManyToManyField(Image, related_name='products_secondary', blank=True)
@@ -62,6 +73,49 @@ class Product(models.Model):
     def get_vat_amount(self):
         """Retorna la cantidad de IVA"""
         return round(self.price * VAT_RATE, 2)
+
+
+class StockReservation(models.Model):
+    STATUS_ACTIVE = "active"
+    STATUS_COMPLETED = "completed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_EXPIRED = "expired"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Activa"),
+        (STATUS_COMPLETED, "Completada"),
+        (STATUS_CANCELLED, "Cancelada"),
+        (STATUS_EXPIRED, "Expirada"),
+    ]
+
+    PAYMENT_STRIPE = "stripe"
+    PAYMENT_PAYPAL = "paypal"
+    PAYMENT_CHOICES = [
+        (PAYMENT_STRIPE, "Stripe"),
+        (PAYMENT_PAYPAL, "PayPal"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="stock_reservations")
+    session_key = models.CharField(max_length=40, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Reserva {self.id} - {self.user or self.session_key} ({self.status})"
+
+
+class StockReservationItem(models.Model):
+    reservation = models.ForeignKey(StockReservation, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="stock_reservation_items")
+    quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = ("reservation", "product")
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product.name} (reserva {self.reservation_id})"
 
 
 class Cart(models.Model):
@@ -136,11 +190,17 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PAID)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default=PAYMENT_MANUAL)
     payment_reference = models.CharField(max_length=200, blank=True, default="")
+    transaction_code = models.CharField(max_length=38, unique=True, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Pedido {self.id} - {self.buyer or self.session_key}"
+
+    def save(self, *args, **kwargs):
+        if not self.transaction_code:
+            self.transaction_code = generate_transaction_code()
+        super().save(*args, **kwargs)
 
     def get_items_count(self):
         return sum(item.quantity for item in self.items.all())
