@@ -46,6 +46,14 @@
                         </div>
                     </div>
 
+                    <!-- Stock -->
+                    <div class="mb-3">
+                        <label for="stock" class="form-label">Stock disponible <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="stock" name="stock" required
+                               min="0" step="1" value="{{ producto.stock }}" placeholder="0">
+                        <div class="form-text">Cantidad máxima que podrán comprar los clientes.</div>
+                    </div>
+
                     <!-- Categoría -->
                     <div class="mb-3">
                         <label for="category" class="form-label">Categoría <span class="text-danger">*</span></label>

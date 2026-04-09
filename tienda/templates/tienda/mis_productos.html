@@ -31,6 +31,7 @@
                 <th>Categoría</th>
                 <th class="text-end">Precio (sin IVA)</th>
                 <th class="text-end">Precio (con IVA)</th>
+                <th class="text-end">Stock</th>
                 <th class="text-end">Acciones</th>
             </tr>
         </thead>
@@ -53,6 +54,7 @@
                 <td>{{ producto.category.name }}</td>
                 <td class="text-end">{{ producto.price|format_price }}€</td>
                 <td class="text-end text-success"><strong>{{ producto.get_price_with_vat|format_price }}€</strong></td>
+                <td class="text-end">{{ producto.stock }}</td>
                 <td class="text-end">
                     <div class="d-flex justify-content-end gap-2">
                         <a href="{% url 'editar_producto' producto.id %}" class="btn btn-outline-primary btn-sm">Editar</a>
