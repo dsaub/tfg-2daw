@@ -46,6 +46,13 @@ urlpatterns = [
     path("usuario/mensajes/", views.mensajes_comprador, name="mensajes_comprador"),
     path("verify/<str:code>", views.verify, name="verify"),
     path("rgpd", views.rgpd, name="rgpd"),
+    path("privacidad", views.rgpd, name="privacidad"),
+    path("devoluciones", views.devoluciones, name="devoluciones"),
+    path("aviso-legal", views.aviso_legal, name="aviso_legal"),
+    path("terminos", views.terminos, name="terminos"),
+    path("cookies", views.cookies, name="cookies"),
+    path("sobre-nosotros", views.sobre_nosotros, name="sobre_nosotros"),
+    path("ayuda", views.ayuda, name="ayuda"),
     path("reset-password", views.reset_password, name="reset_password"),
     path("reset-password-phase2/<str:code>", views.reset_password_phase2, name="reset_password_phase2")
 ]
