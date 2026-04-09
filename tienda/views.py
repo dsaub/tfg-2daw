@@ -33,6 +33,8 @@ import logging
 
 logger = logging.getLogger("tienda")
 audit_logger = logging.getLogger("tienda.audit")
+STOCK_RESERVATION_SESSION_KEY = "stock_reservation_id"
+STOCK_RESERVATION_PAYMENT_SESSION_KEY = "stock_reservation_payment_method"
 
 
 def _normalize_location_text(value: str) -> str:
@@ -299,6 +301,154 @@ def get_or_create_cart(request):
     return cart
 
 
+def _get_or_create_session_key(request: HttpRequest):
+    if not request.session.session_key:
+        request.session.create()
+    return request.session.session_key
+
+
+def _get_reservation_owner_filters(request: HttpRequest):
+    if request.user.is_authenticated:
+        return {"user": request.user}
+    return {"session_key": _get_or_create_session_key(request)}
+
+
+def _release_expired_stock_reservations():
+    now = timezone.now()
+    StockReservation.objects.filter(
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__lte=now,
+    ).update(status=StockReservation.STATUS_EXPIRED)
+
+
+def _clear_stock_reservation_session(request: HttpRequest):
+    request.session.pop(STOCK_RESERVATION_SESSION_KEY, None)
+    request.session.pop(STOCK_RESERVATION_PAYMENT_SESSION_KEY, None)
+
+
+def _cancel_active_stock_reservations_for_request(request: HttpRequest):
+    _release_expired_stock_reservations()
+    StockReservation.objects.filter(
+        **_get_reservation_owner_filters(request),
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__gt=timezone.now(),
+    ).update(status=StockReservation.STATUS_CANCELLED)
+
+
+def _get_reserved_quantities_by_product(product_ids, exclude_reservation_id=None):
+    if not product_ids:
+        return {}
+
+    reserved_qs = StockReservationItem.objects.filter(
+        product_id__in=product_ids,
+        reservation__status=StockReservation.STATUS_ACTIVE,
+        reservation__expires_at__gt=timezone.now(),
+    )
+    if exclude_reservation_id:
+        reserved_qs = reserved_qs.exclude(reservation_id=exclude_reservation_id)
+
+    reserved_totals = reserved_qs.values("product_id").annotate(total_reserved=models.Sum("quantity"))
+    return {row["product_id"]: row["total_reserved"] for row in reserved_totals}
+
+
+def _get_available_stock_by_product(product_ids, exclude_reservation_id=None):
+    _release_expired_stock_reservations()
+    products = Product.objects.filter(id__in=product_ids)
+    stocks = {product.id: product.stock for product in products}
+    reserved = _get_reserved_quantities_by_product(product_ids, exclude_reservation_id=exclude_reservation_id)
+    return {
+        product_id: max(stocks.get(product_id, 0) - reserved.get(product_id, 0), 0)
+        for product_id in product_ids
+    }
+
+
+def _get_cart_stock_issues(cart_items, exclude_reservation_id=None):
+    product_ids = [item.product_id for item in cart_items]
+    available_by_product = _get_available_stock_by_product(product_ids, exclude_reservation_id=exclude_reservation_id)
+
+    issues = []
+    for item in cart_items:
+        available = available_by_product.get(item.product_id, 0)
+        if item.quantity > available:
+            issues.append({
+                "product_name": item.product.name,
+                "requested": item.quantity,
+                "available": available,
+            })
+    return issues
+
+
+def _build_stock_issue_message(issue):
+    return (
+        f"No hay stock suficiente de '{issue['product_name']}'. "
+        f"Disponible: {issue['available']}, solicitado: {issue['requested']}."
+    )
+
+
+def _create_stock_reservation_for_cart(request: HttpRequest, cart_items, payment_method: str):
+    if not cart_items:
+        return None, ["El carrito está vacío."]
+
+    _release_expired_stock_reservations()
+
+    with transaction.atomic():
+        StockReservation.objects.select_for_update().filter(
+            **_get_reservation_owner_filters(request),
+            status=StockReservation.STATUS_ACTIVE,
+            expires_at__gt=timezone.now(),
+        ).update(status=StockReservation.STATUS_CANCELLED)
+
+        product_ids = [item.product_id for item in cart_items]
+        products = Product.objects.select_for_update().filter(id__in=product_ids)
+        product_stock = {product.id: product.stock for product in products}
+        reserved = _get_reserved_quantities_by_product(product_ids)
+
+        issues = []
+        for item in cart_items:
+            available = max(product_stock.get(item.product_id, 0) - reserved.get(item.product_id, 0), 0)
+            if item.quantity > available:
+                issues.append(_build_stock_issue_message({
+                    "product_name": item.product.name,
+                    "requested": item.quantity,
+                    "available": available,
+                }))
+
+        if issues:
+            return None, issues
+
+        reservation = StockReservation.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            session_key=None if request.user.is_authenticated else _get_or_create_session_key(request),
+            payment_method=payment_method,
+            expires_at=timezone.now() + timedelta(minutes=STOCK_RESERVATION_MINUTES),
+        )
+        StockReservationItem.objects.bulk_create([
+            StockReservationItem(
+                reservation=reservation,
+                product=item.product,
+                quantity=item.quantity,
+            )
+            for item in cart_items
+        ])
+
+    return reservation, []
+
+
+def _get_session_stock_reservation(request: HttpRequest, payment_method: str):
+    reservation_id = request.session.get(STOCK_RESERVATION_SESSION_KEY)
+    reservation_payment_method = request.session.get(STOCK_RESERVATION_PAYMENT_SESSION_KEY)
+    if not reservation_id or reservation_payment_method != payment_method:
+        return None
+
+    return StockReservation.objects.filter(
+        id=reservation_id,
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__gt=timezone.now(),
+        payment_method=payment_method,
+        **_get_reservation_owner_filters(request),
+    ).first()
+
+
 def _get_selected_shipping_address(request: HttpRequest):
     """Obtiene la dirección seleccionada desde JSON o form-data y valida pertenencia al usuario."""
     shipping_address_id = request.POST.get("shipping_address_id")
@@ -321,13 +471,13 @@ def _get_selected_shipping_address(request: HttpRequest):
     return ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
 
 
-def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None):
-    """Crea un pedido a partir del carrito actual y lo asigna a vendedores."""
+def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None, stock_reservation=None):
+    """Crea un pedido a partir del carrito actual, validando y descontando stock."""
     cart = get_or_create_cart(request)
     cart_items = list(cart.items.select_related("product", "product__creator"))
 
     if not cart_items:
-        return None
+        return None, "El carrito está vacío."
 
     order_total = Decimal("0.00")
     items_with_totals = []
@@ -350,7 +500,62 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             }
         )
 
+    _release_expired_stock_reservations()
+
     with transaction.atomic():
+        locked_reservation = None
+        reserved_by_product = {}
+
+        if stock_reservation is not None:
+            locked_reservation = StockReservation.objects.select_for_update().filter(
+                id=stock_reservation.id,
+                status=StockReservation.STATUS_ACTIVE,
+                expires_at__gt=timezone.now(),
+            ).first()
+            if locked_reservation is None:
+                return None, (
+                    f"La reserva de stock ha caducado. Tienes {STOCK_RESERVATION_MINUTES} minutos "
+                    "desde que pulsas pagar. Revisa el carrito y vuelve a intentarlo."
+                )
+
+            for reservation_item in locked_reservation.items.all():
+                reserved_by_product[reservation_item.product_id] = reservation_item.quantity
+
+        product_ids = [item.product_id for item in cart_items]
+        products = Product.objects.select_for_update().filter(id__in=product_ids)
+        product_map = {product.id: product for product in products}
+
+        reserved_from_others = _get_reserved_quantities_by_product(
+            product_ids,
+            exclude_reservation_id=locked_reservation.id if locked_reservation else None,
+        )
+
+        for item in cart_items:
+            product = product_map.get(item.product_id)
+            if product is None:
+                return None, f"El producto '{item.product.name}' ya no está disponible."
+
+            if locked_reservation is not None and item.quantity > reserved_by_product.get(item.product_id, 0):
+                return None, (
+                    f"La cantidad de '{item.product.name}' ha cambiado desde la reserva. "
+                    "Vuelve a intentar el pago."
+                )
+
+            available = max(product.stock - reserved_from_others.get(item.product_id, 0), 0)
+            if item.quantity > available:
+                return None, _build_stock_issue_message({
+                    "product_name": item.product.name,
+                    "requested": item.quantity,
+                    "available": available,
+                })
+
+            if product.stock < item.quantity:
+                return None, _build_stock_issue_message({
+                    "product_name": item.product.name,
+                    "requested": item.quantity,
+                    "available": product.stock,
+                })
+
         order = Order.objects.create(
             buyer=request.user if request.user.is_authenticated else None,
             shipping_address=shipping_address,
@@ -373,7 +578,15 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
                 total_price=float(line_total_with_vat),
             )
 
+            product_row = product_map.get(item.product_id)
+            product_row.stock -= item.quantity
+            product_row.save(update_fields=["stock"])
+
         cart.items.all().delete()
+
+        if locked_reservation is not None:
+            locked_reservation.status = StockReservation.STATUS_COMPLETED
+            locked_reservation.save(update_fields=["status", "updated_at"])
 
     if request.user.is_authenticated and purchased_items:
         tasks.process_purchase.delay(
@@ -383,7 +596,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             order.transaction_code,
         )
 
-    return order
+    return order, ""
 
 
 def add_to_cart(request: HttpRequest, product_id: int):
