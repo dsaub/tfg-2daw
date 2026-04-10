@@ -959,7 +959,10 @@ def crear_producto(request: HttpRequest):
                 name=f"{name}_principal",
                 image=primary_image_file
             )
-        
+        if stock > 4294967295:
+            messages.error(request, "No se puede tener mas de 4294967295 existencias. Por favor, intentelo de nuevo")
+            categories = Category.objects.all()
+            return render(request, "tienda/crear_producto.html", {"categories": categories})
         # Crear producto
         producto = Product.objects.create(
             name=name,
