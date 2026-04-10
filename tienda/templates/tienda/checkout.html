@@ -104,19 +104,16 @@
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="2" class="text-end">Subtotal:</th>
-                        <th colspan="2" class="text-end">{{ cart.get_total|format_price }}€</th>
-                        <td></td>
+                        <th colspan="4" class="text-end">Subtotal:</th>
+                        <th class="text-end">{{ cart.get_total|format_price }}€</th>
                     </tr>
                     <tr>
-                        <th colspan="2" class="text-end">IVA (21%):</th>
-                        <th colspan="2" class="text-end text-success">+{{ cart.get_vat_amount|format_price }}€</th>
-                        <td></td>
+                        <th colspan="4" class="text-end">IVA (21%):</th>
+                        <th class="text-end text-success">+{{ cart.get_vat_amount|format_price }}€</th>
                     </tr>
                     <tr style="background-color: #f8f9fa;">
-                        <th colspan="2" class="text-end" style="font-size: 1.1rem;">Total:</th>
-                        <th colspan="2" class="text-end" style="font-size: 1.1rem;">{{ cart.get_total_with_vat|format_price }}€</th>
-                        <td></td>
+                        <th colspan="4" class="text-end" style="font-size: 1.1rem;">Total:</th>
+                        <th class="text-end" style="font-size: 1.1rem;">{{ cart.get_total_with_vat|format_price }}€</th>
                     </tr>
                 </tfoot>
             </table>

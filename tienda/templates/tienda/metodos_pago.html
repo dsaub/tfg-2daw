@@ -38,8 +38,8 @@
                 <a href="{% url 'agregar_tarjeta' %}" class="btn btn-sm btn-success">➕ Añadir tarjeta</a>
             </div>
             <div class="card-body">
-                {% for metodo in metodos %}
-                {% if metodo.method_type == 'card' %}
+                {% with has_card=False %}
+                {% for metodo in metodos %}{% if metodo.method_type == 'card' %}
                 <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
                     <div>
                         <span class="fw-semibold">{{ metodo.label }}</span>
@@ -50,9 +50,9 @@
                         <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
                     </form>
                 </div>
-                {% endif %}
-                {% endfor %}
-                {% if not metodos %}
+                {% endif %}{% endfor %}
+                {% endwith %}
+                {% if not cards_exist %}
                 <p class="text-muted mb-0">No tienes tarjetas guardadas.</p>
                 {% endif %}
             </div>
@@ -67,8 +67,7 @@
                 <a href="{% url 'agregar_paypal' %}" class="btn btn-sm btn-warning">➕ Añadir PayPal</a>
             </div>
             <div class="card-body">
-                {% for metodo in metodos %}
-                {% if metodo.method_type == 'paypal' %}
+                {% for metodo in metodos %}{% if metodo.method_type == 'paypal' %}
                 <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
                     <div>
                         <span class="fw-semibold">{{ metodo.paypal_email }}</span>
@@ -79,9 +78,8 @@
                         <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
                     </form>
                 </div>
-                {% endif %}
-                {% endfor %}
-                {% if not metodos %}
+                {% endif %}{% endfor %}
+                {% if not paypal_exist %}
                 <p class="text-muted mb-0">No tienes cuentas de PayPal guardadas.</p>
                 {% endif %}
             </div>

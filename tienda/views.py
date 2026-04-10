@@ -28,7 +28,7 @@ import unicodedata
 import json
 import random, string
 import logging
-import requests as http_requests
+import requests
 # Create your views here.
 
 
@@ -110,7 +110,7 @@ def _get_paypal_base_url() -> str:
 def _get_paypal_access_token() -> str:
     """Obtiene un access token de la API de PayPal."""
     url = f"{_get_paypal_base_url()}/v1/oauth2/token"
-    response = http_requests.post(
+    response = requests.post(
         url,
         auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_CLIENT_SECRET),
         data={"grant_type": "client_credentials"},
@@ -144,7 +144,7 @@ def _paypal_create_order(amount_eur: Decimal) -> dict:
             "user_action": "PAY_NOW",
         },
     }
-    response = http_requests.post(url, headers=headers, json=payload, timeout=15)
+    response = requests.post(url, headers=headers, json=payload, timeout=15)
     response.raise_for_status()
     return response.json()
 
@@ -157,7 +157,7 @@ def _paypal_capture_order(order_id: str) -> dict:
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
-    response = http_requests.post(url, headers=headers, json={}, timeout=15)
+    response = requests.post(url, headers=headers, json={}, timeout=15)
     response.raise_for_status()
     return response.json()
 
@@ -1199,7 +1199,7 @@ def create_checkout_session(request: HttpRequest):
         return JsonResponse({"sessionId": session.id})
     except Exception as e:
         logger.exception("STRIPE_CHECKOUT_SESSION_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al crear sesión de pago: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al crear la sesión de pago. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1546,7 +1546,7 @@ def crear_payment_intent(request: HttpRequest):
 
     except Exception as e:
         logger.exception("CREATE_PAYMENT_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al crear el intento de pago: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al crear el pago. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1672,7 +1672,7 @@ def crear_orden_paypal(request: HttpRequest):
 
     except Exception as e:
         logger.exception("CREAR_ORDEN_PAYPAL_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al crear la orden de PayPal: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al crear la orden de PayPal. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1706,7 +1706,7 @@ def capturar_orden_paypal(request: HttpRequest):
         capture_data = _paypal_capture_order(paypal_order_id)
     except Exception as e:
         logger.exception("CAPTURAR_ORDEN_PAYPAL_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al capturar el pago de PayPal: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al capturar el pago de PayPal. Por favor inténtalo de nuevo."}, status=500)
 
     capture_status = capture_data.get("status")
     if capture_status != "COMPLETED":
@@ -1772,7 +1772,8 @@ def metodos_pago(request: HttpRequest):
     metodos = SavedPaymentMethod.objects.filter(user=request.user)
     return render(request, "tienda/metodos_pago.html", {
         "metodos": metodos,
-        "paypal_client_id": settings.PAYPAL_CLIENT_ID,
+        "cards_exist": metodos.filter(method_type=SavedPaymentMethod.TYPE_CARD).exists(),
+        "paypal_exist": metodos.filter(method_type=SavedPaymentMethod.TYPE_PAYPAL).exists(),
     })
 
 
@@ -1805,7 +1806,7 @@ def crear_setup_intent(request: HttpRequest):
         })
     except Exception as e:
         logger.exception("CREATE_SETUP_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al iniciar el proceso: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al iniciar el proceso de configuración. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1851,7 +1852,7 @@ def confirmar_setup_intent(request: HttpRequest):
 
     except Exception as e:
         logger.exception("CONFIRMAR_SETUP_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al guardar la tarjeta: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al guardar la tarjeta. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1897,7 +1898,7 @@ def crear_orden_paypal_setup(request: HttpRequest):
         return JsonResponse({"id": paypal_order.get("id")})
     except Exception as e:
         logger.exception("CREAR_ORDEN_PAYPAL_SETUP_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al iniciar el proceso: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al iniciar la verificación de PayPal. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1922,7 +1923,7 @@ def capturar_orden_paypal_setup(request: HttpRequest):
         capture_data = _paypal_capture_order(paypal_order_id)
     except Exception as e:
         logger.exception("CAPTURAR_PAYPAL_SETUP_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al verificar la cuenta: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al verificar la cuenta de PayPal. Por favor inténtalo de nuevo."}, status=500)
 
     if capture_data.get("status") != "COMPLETED":
         return JsonResponse({"error": "No se pudo verificar la cuenta de PayPal"}, status=400)
@@ -1953,27 +1954,6 @@ def capturar_orden_paypal_setup(request: HttpRequest):
         return JsonResponse({"success": True, "email": payer_email, "already_existed": False})
     else:
         return JsonResponse({"success": True, "email": payer_email, "already_existed": True})
-
-
-    """API AJAX que retorna sugerencias de búsqueda en JSON"""
-    query = request.GET.get('q', '').strip()
-    suggestions = []
-    
-    if query and len(query) >= 2:  # Mínimo 2 caracteres para sugerir
-        # Buscar en nombre (primario) y descripción
-        products = Product.objects.filter(
-            models.Q(name__icontains=query) | 
-            models.Q(briefdesc__icontains=query)
-        ).values_list('name', 'id', 'price', 'primary_image_id').distinct()[:8]  # Máximo 8 sugerencias
-        
-        for name, product_id, price, image_id in products:
-            suggestions.append({
-                'name': name,
-                'id': product_id,
-                'price': float(price)
-            })
-    
-    return JsonResponse({'suggestions': suggestions})
 
 
 # ==================== PORTAL DE USUARIO ====================
