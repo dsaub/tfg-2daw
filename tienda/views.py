@@ -857,10 +857,11 @@ def pedidos_vendedor(request: HttpRequest):
     pedidos = OrderItem.objects.filter(seller=request.user).select_related(
         'order', 'product', 'order__buyer', 'order__shipping_address'
     ).prefetch_related('messages__sender').order_by('-created_at')
+    total_pedidos_por_enviar = pedidos.exclude(status=OrderItem.STATUS_SHIPPED).count()
 
     return render(request, "tienda/pedidos_vendedor.html", {
         "pedidos": pedidos,
-        "total_pedidos": pedidos.count()
+        "total_pedidos": total_pedidos_por_enviar
     })
 
 
