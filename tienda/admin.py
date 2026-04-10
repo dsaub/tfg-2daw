@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode
+from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode, SavedPaymentMethod
 # Register your models here.
 
 admin.site.register(Category)
@@ -87,3 +87,10 @@ class StockReservationAdmin(admin.ModelAdmin):
     list_filter = ('status', 'payment_method', 'created_at')
     search_fields = ('user__username', 'user__email', 'session_key')
     inlines = [StockReservationItemInline]
+
+
+@admin.register(SavedPaymentMethod)
+class SavedPaymentMethodAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'method_type', 'label', 'is_default', 'created_at')
+    list_filter = ('method_type', 'is_default', 'created_at')
+    search_fields = ('user__username', 'user__email', 'label', 'paypal_email')
