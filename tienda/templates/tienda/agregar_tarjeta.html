@@ -1,0 +1,130 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block head %}
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+    #card-element {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+        padding: 12px;
+        background-color: #fff;
+    }
+    #card-element.StripeElement--focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, .25);
+    }
+    #card-element.StripeElement--invalid { border-color: #dc3545; }
+    #card-errors { color: #dc3545; font-size: 0.875rem; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2>Añadir Tarjeta</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal_usuario' %}">Portal de Usuario</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'metodos_pago' %}">Métodos de Pago</a></li>
+                <li class="breadcrumb-item active">Añadir Tarjeta</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mt-3 justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Introduce los datos de tu tarjeta. No se realizará ningún cobro ahora; la tarjeta
+                    se guardará de forma segura en Stripe para usar en tus próximas compras.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label">Datos de la tarjeta</label>
+                    <div id="card-element"></div>
+                    <div id="card-errors" role="alert"></div>
+                </div>
+
+                <button id="save-card-btn" class="btn btn-primary w-100">
+                    💳 Guardar tarjeta
+                </button>
+                <div id="save-spinner" class="text-center mt-3 d-none">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="text-muted mt-2">Procesando...</p>
+                </div>
+                <div id="save-success" class="alert alert-success mt-3 d-none">
+                    ✅ Tarjeta guardada correctamente.
+                    <a href="{% url 'metodos_pago' %}" class="alert-link">Ver mis métodos de pago</a>
+                </div>
+
+                <a href="{% url 'metodos_pago' %}" class="btn btn-outline-secondary w-100 mt-3">Cancelar</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]') ?
+    document.querySelector('[name=csrfmiddlewaretoken]').value :
+    document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+
+const stripe = Stripe('{{ stripe_publishable_key }}');
+const elements = stripe.elements();
+const cardElement = elements.create('card', { hidePostalCode: true });
+cardElement.mount('#card-element');
+
+cardElement.on('change', e => {
+    document.getElementById('card-errors').textContent = e.error ? e.error.message : '';
+});
+
+document.getElementById('save-card-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('save-card-btn');
+    const spinner = document.getElementById('save-spinner');
+    const errDiv = document.getElementById('card-errors');
+
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+    errDiv.textContent = '';
+
+    try {
+        // 1. Get SetupIntent client_secret from backend
+        const siResp = await fetch('{% url "crear_setup_intent" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({}),
+        });
+        const siData = await siResp.json();
+        if (!siResp.ok) throw new Error(siData.error || 'Error al iniciar el proceso');
+
+        // 2. Confirm SetupIntent with the card element
+        const { setupIntent, error } = await stripe.confirmCardSetup(siData.client_secret, {
+            payment_method: { card: cardElement },
+        });
+        if (error) throw new Error(error.message);
+
+        // 3. Save to database
+        const saveResp = await fetch('{% url "confirmar_setup_intent" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ payment_method_id: setupIntent.payment_method }),
+        });
+        const saveData = await saveResp.json();
+        if (!saveResp.ok) throw new Error(saveData.error || 'Error al guardar la tarjeta');
+
+        // 4. Success
+        spinner.classList.add('d-none');
+        document.getElementById('save-success').classList.remove('d-none');
+        btn.style.display = 'none';
+
+    } catch (err) {
+        errDiv.textContent = err.message;
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}
