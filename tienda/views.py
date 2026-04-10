@@ -1008,6 +1008,13 @@ def editar_producto(request: HttpRequest, id: int):
         primary_image_file = request.FILES.get("primary_image")
         secondary_images_files = request.FILES.getlist("secondary_images")
 
+        if stock > 4294967295:
+            messages.error(request, "No se puede tener mas de 4294967295 de stock.")
+            categories = Category.objects.all()
+            return render(request, "tienda/editar_producto.html", {
+                "categories": categories,
+                "producto": producto
+            })
         if not all([name, description, price, stock, category_id]):
             messages.error(request, "Por favor completa todos los campos obligatorios.")
             categories = Category.objects.all()
