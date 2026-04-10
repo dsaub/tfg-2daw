@@ -1647,6 +1647,24 @@ def reset_password(request: HttpRequest):
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
 
+def devoluciones(request: HttpRequest):
+    return render(request, "tienda/devoluciones.html", {})
+
+def aviso_legal(request: HttpRequest):
+    return render(request, "tienda/aviso_legal.html", {})
+
+def terminos(request: HttpRequest):
+    return render(request, "tienda/terminos.html", {})
+
+def cookies(request: HttpRequest):
+    return render(request, "tienda/cookies.html", {})
+
+def sobre_nosotros(request: HttpRequest):
+    return render(request, "tienda/sobre_nosotros.html", {})
+
+def ayuda(request: HttpRequest):
+    return render(request, "tienda/ayuda.html", {})
+
 def reset_password(request: HttpRequest):
     if request.method == "GET":
         return render(request, "tienda/reset_password.html", {})

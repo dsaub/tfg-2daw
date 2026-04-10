@@ -234,4 +234,44 @@ p.price {
   object-position: center;
 }
 
+/* Estilos para el footer */
+.footer-link {
+  color: inherit;
+  text-decoration: none;
+}
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+/* Estilos para páginas legales / informativas */
+.legal-container {
+  max-width: 860px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+.legal-container h1 {
+  margin-bottom: 1.5rem;
+}
+
+.legal-section {
+  margin-bottom: 2rem;
+}
+.legal-section h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 0.25rem;
+}
+.legal-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.legal-footer {
+  margin-top: 2rem;
+  color: #6c757d;
+}
+
 /*# sourceMappingURL=custom.css.map */
