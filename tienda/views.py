@@ -1832,11 +1832,36 @@ def confirmar_setup_intent(request: HttpRequest):
         customer_id = _get_or_create_stripe_customer(request.user)
 
         # Attach the PaymentMethod to the customer
-        stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+        try:
+            stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+        except stripe.error.InvalidRequestError as attach_err:
+            # The payment method may already be attached to a customer
+            pm_check = stripe.PaymentMethod.retrieve(payment_method_id)
+            if pm_check.get("customer") == customer_id:
+                # Already attached to this same customer – continue normally
+                pass
+            else:
+                logger.warning(
+                    "CONFIRMAR_SETUP_INTENT_ALREADY_ATTACHED user_id=%s pm=%s error=%s",
+                    request.user.id, payment_method_id, str(attach_err),
+                )
+                return JsonResponse(
+                    {"error": "Este método de pago ya está asociado a otra cuenta. "
+                              "Por favor, usa una tarjeta diferente."},
+                    status=400,
+                )
 
         pm = stripe.PaymentMethod.retrieve(payment_method_id)
         card = pm.card
         label = f"{card.brand.capitalize()} •••• {card.last4} (exp. {card.exp_month:02d}/{card.exp_year})"
+
+        # Avoid saving duplicates in our database
+        existing = SavedPaymentMethod.objects.filter(
+            user=request.user,
+            stripe_payment_method_id=payment_method_id,
+        ).first()
+        if existing:
+            return JsonResponse({"success": True, "label": existing.label, "id": existing.id})
 
         has_existing = SavedPaymentMethod.objects.filter(user=request.user).exists()
         saved = SavedPaymentMethod.objects.create(
