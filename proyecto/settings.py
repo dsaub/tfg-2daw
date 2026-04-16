@@ -15,6 +15,9 @@ import os, sys
 from pathlib import Path
 
 
+RUNNING_TESTS = any(arg in {'test', 'pytest'} for arg in sys.argv) or 'PYTEST_CURRENT_TEST' in os.environ
+
+
 def load_dotenv(dotenv_path: Path) -> None:
     if not dotenv_path.exists():
         return
@@ -126,21 +129,24 @@ WSGI_APPLICATION = 'proyecto.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-# Activa MySQL con MYSQL_ENABLED=True en el .env; si no, se usa SQLite.
+# Usa PostgreSQL por defecto (POSTGRES_ENABLED=True); si no, SQLite.
 
-if env_bool('MYSQL_ENABLED', False):
+if RUNNING_TESTS:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': os.getenv('MYSQL_DATABASE', 'tienda'),
-            'USER': os.getenv('MYSQL_USER', 'root'),
-            'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
-            'HOST': os.getenv('MYSQL_HOST', '127.0.0.1'),
-            'PORT': env_int('MYSQL_PORT', 3306),
-            'OPTIONS': {
-                'charset': 'utf8mb4',
-                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            },
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+elif env_bool('POSTGRES_ENABLED', True):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB', 'tienda'),
+            'USER': os.getenv('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+            'HOST': os.getenv('POSTGRES_HOST', '127.0.0.1'),
+            'PORT': env_int('POSTGRES_PORT', 5432),
         }
     }
 else:
@@ -207,16 +213,7 @@ STATICFILES_FINDERS = [
     'compressor.finders.CompressorFinder'
 ]
 
-COMPRESS_PRECOMPILERS = (
-    ('text/x-scss', 'sass {infile} {outfile} --load-path=tienda/static/scss'),
-)
-
-import shutil
-SASS_BINARY = shutil.which('sass')
-if SASS_BINARY:
-    COMPRESS_PRECOMPILERS = (
-        ('text/x-scss', f'{SASS_BINARY} {{infile}} {{outfile}} --load-path=tienda/static/scss'),
-    )
+COMPRESS_PRECOMPILERS = ()
 
 # Media files (User uploads)
 MEDIA_URL = 'media/'
@@ -267,7 +264,7 @@ SECURITY = os.getenv('SECURITY', 'tls')
 SMTP_USERNAME = os.getenv('SMTP_USERNAME', None)
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', None)
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", None)
-if SMTP_USERNAME is None or SMTP_PASSWORD is None or SMTP_EMAIL is None:
+if not RUNNING_TESTS and (SMTP_USERNAME is None or SMTP_PASSWORD is None or SMTP_EMAIL is None):
     print("Se requieren credenciales SMTP")
     sys.exit(1)
 
@@ -354,7 +351,11 @@ logging.captureWarnings(True)
 
 
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+if RUNNING_TESTS:
+    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
 EMAIL_HOST = SMTP_ENDPOINT
 EMAIL_PORT = SMTP_PORT
 EMAIL_USE_TLS = (SECURITY == 'tls')  # True si SECURITY es 'tls'

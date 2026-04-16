@@ -1,19 +1,28 @@
-FROM python:3.14-slim
+FROM python:3.14-alpine
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV DEBIANFRONTEND=noninteractive
 WORKDIR /app
 
-RUN apt update && apt install -y build-essential figlet libpq-dev default-libmysqlclient-dev pkg-config && rm -rf /var/lib/apt/lists/*
+RUN adduser -D -S app
 
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apk --no-cache update && apk --no-cache upgrade
+RUN apk add --no-cache --virtual .build-deps build-base mariadb-dev libffi-dev \
+    && apk add --no-cache mariadb-connector-c \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apk del .build-deps
 
 COPY . /app/
 RUN chmod +x /app/entrypoint.sh
 
+
 EXPOSE 8000
 RUN mkdir -pv /fonts
 COPY tienda/static/fonts/ /fonts/
-CMD ["/app/entrypoint.sh"]
+
+RUN chown -R app: /app /fonts
+RUN chmod 770 /app/entrypoint.sh
+USER app
+
+ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]

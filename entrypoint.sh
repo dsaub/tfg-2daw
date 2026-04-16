@@ -1,6 +1,5 @@
-#!/bin/bash
+#!/bin/sh
 
-figlet Proyecto MVC
 echo "Sleeping due to mysql..."
 sleep 10
 echo "Running DB migrations..."
