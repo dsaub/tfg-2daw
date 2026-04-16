@@ -36,10 +36,20 @@ class VerificationCode(models.Model):
         choices = VerificationModes.choices,
         default = VerificationModes.VERIFY_ACCOUNT   
     )
+    
+    def generate(user: User, code_mode: str) -> VerificationCode:
+        while True:
+            code = "".join(random.choices(string.ascii_letters+string.digits+string.punctuation))
+            if not VerificationCode.objects.filter(code=code).exists():
+                return VerificationCode.objects.create(
+                    code = code,
+                    user = user,
+                    code_mode = code_mode
+                )
 
 # Create your models here.
 class Category(models.Model):
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, unique=True)
 
     def __str__(self):
         return self.name

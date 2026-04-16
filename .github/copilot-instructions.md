@@ -27,10 +27,7 @@ Templates use Django's inheritance pattern:
 - **Collection directory**: `STATIC_ROOT = BASE_DIR / 'staticfiles'` for production
 - **Development dirs**: `STATICFILES_DIRS` includes `tienda/static/`
 - **URL prefix**: `STATIC_URL = 'static/'`
-- **SCSS compilation**: Styles are authored in [tienda/static/scss/custom.scss](tienda/static/scss/custom.scss) and compiled to [tienda/static/css/custom.css](tienda/static/css/custom.css)
-  - **IMPORTANT**: Always edit `custom.scss`, never `custom.css` - CSS file is auto-generated
-  - Compile with Sass compiler (npm sass or similar)
-- Bootstrap CSS is vendored in `tienda/static/css/styles.css` - don't add CDN links
+- **Custom CSS**: Edit [tienda/static/css/custom.css](tienda/static/css/custom.css) directly - no compilation needed
 
 ## Media Files (User Uploads) Configuration
 - **Storage location**: `MEDIA_ROOT = BASE_DIR / 'tienda' / 'static' / 'media'` - all uploads go here
