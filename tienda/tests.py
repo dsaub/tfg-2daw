@@ -1802,6 +1802,8 @@ class EndpointViewTests(TestCase):
             "confirm_password": "PasswordNueva123!",
         })
         self.assertEqual(changed.status_code, 302)
+        self.buyer.refresh_from_db()
+        self.assertTrue(self.buyer.check_password("PasswordNueva123!"))
 
         invalid_city = self.client.post(reverse("crear_direccion"), data={
             "full_name": "Comprador Uno",
