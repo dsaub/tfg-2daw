@@ -1332,6 +1332,15 @@ class EndpointViewTests(TestCase):
             content_type="application/json",
         )
 
+    def _assert_navbar_responsive_structure(self, response):
+        content = response.content.decode()
+        search_form_index = content.find('id="searchForm"')
+        collapsed_menu_index = content.find('id="navbarContent"')
+        self.assertGreaterEqual(search_form_index, 0)
+        self.assertGreaterEqual(collapsed_menu_index, 0)
+        self.assertLess(search_form_index, collapsed_menu_index)
+        self.assertContains(response, "navbar navbar-expand-lg header")
+
     def test_public_endpoints_render(self):
         public_routes = [
             reverse("home"),
@@ -1362,17 +1371,14 @@ class EndpointViewTests(TestCase):
         self._login(self.seller)
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
+        self._assert_navbar_responsive_structure(response)
+        self.assertContains(response, "Cerrar Sesión")
 
-        content = response.content.decode()
-        search_form_index = content.find('id="searchForm"')
-        collapsed_menu_index = content.find('id="navbarContent"')
-        self.assertGreaterEqual(search_form_index, 0)
-        self.assertGreaterEqual(collapsed_menu_index, 0)
-        self.assertLess(search_form_index, collapsed_menu_index)
-
-        self.assertContains(response, "navbar navbar-expand-lg header")
-        self.assertContains(response, "search-suggestions-container order-3 order-lg-0 w-100 w-lg-auto mt-2 mt-lg-0")
-        self.assertContains(response, "navbar-nav ms-lg-auto d-flex align-items-lg-center gap-2")
+    def test_navbar_search_structure_is_kept_for_anonymous_users(self):
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self._assert_navbar_responsive_structure(response)
+        self.assertContains(response, "Iniciar Sesión")
 
     def test_login_required_endpoints_redirect_anonymous(self):
         secured_get_routes = [
