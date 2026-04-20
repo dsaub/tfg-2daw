@@ -66,6 +66,10 @@ p.price {
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
+  max-width: calc(100% - 9rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .navbar.header .navbar-toggler {
   border-color: #FFF !important;
