@@ -1,7 +1,11 @@
-from django.test import TestCase
+import json
+from unittest.mock import MagicMock, patch
+
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import IntegrityError
+from django.urls import reverse
 from datetime import timedelta
 from .models import (
     User, VerificationCode, Category, Image, Product, 
@@ -1252,3 +1256,611 @@ class ShippingAddressModelTests(TestCase):
         address_str = str(address)
         self.assertIn("John Doe", address_str)
         self.assertIn("Almería", address_str)
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    SESSION_ENGINE="django.contrib.sessions.backends.db",
+)
+class EndpointViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.password = "StrongPassword123!"
+        cls.buyer = User.objects.create_user(
+            username="buyer",
+            email="buyer@example.com",
+            password=cls.password,
+            registration_status=User.RegisterStatus.ACTIVE,
+        )
+        cls.seller = User.objects.create_user(
+            username="seller",
+            email="seller@example.com",
+            password=cls.password,
+            registration_status=User.RegisterStatus.ACTIVE,
+        )
+        cls.other_user = User.objects.create_user(
+            username="other",
+            email="other@example.com",
+            password=cls.password,
+            registration_status=User.RegisterStatus.ACTIVE,
+        )
+        cls.category = Category.objects.create(name="Electrónica")
+        cls.image = Image.objects.create(name="imagen", image="images/test.jpg")
+        cls.product = Product.objects.create(
+            name="Producto test",
+            briefdesc="Breve",
+            description="Descripción",
+            price=10.0,
+            stock=20,
+            category=cls.category,
+            primary_image=cls.image,
+            creator=cls.seller,
+        )
+        cls.address = ShippingAddress.objects.create(
+            user=cls.buyer,
+            full_name="Comprador Uno",
+            address_line_1="Calle Mayor 1",
+            city="Almería",
+            postal_code="04001",
+            phone="600000001",
+            is_default=True,
+        )
+        cls.other_address = ShippingAddress.objects.create(
+            user=cls.other_user,
+            full_name="Otro Usuario",
+            address_line_1="Calle Otro 2",
+            city="Almería",
+            postal_code="04002",
+            phone="600000002",
+        )
+
+    def _login(self, user=None):
+        self.client.force_login(user or self.buyer)
+
+    def _create_cart_item(self, quantity=1, user=None):
+        owner = user or self.buyer
+        cart, _ = Cart.objects.get_or_create(user=owner)
+        item, _ = CartItem.objects.get_or_create(cart=cart, product=self.product, defaults={"quantity": quantity})
+        item.quantity = quantity
+        item.save()
+        return item
+
+    def _post_json(self, url_name, data, **kwargs):
+        return self.client.post(
+            reverse(url_name, kwargs=kwargs or None),
+            data=json.dumps(data),
+            content_type="application/json",
+        )
+
+    def test_public_endpoints_render(self):
+        public_routes = [
+            reverse("home"),
+            reverse("index"),
+            reverse("productos"),
+            reverse("producto", args=[self.product.id]),
+            reverse("categoria", args=[self.category.id]),
+            reverse("search"),
+            reverse("search_suggestions"),
+            reverse("login"),
+            reverse("register"),
+            reverse("rgpd"),
+            reverse("privacidad"),
+            reverse("devoluciones"),
+            reverse("aviso_legal"),
+            reverse("terminos"),
+            reverse("cookies"),
+            reverse("sobre_nosotros"),
+            reverse("ayuda"),
+            reverse("reset_password"),
+        ]
+        for url in public_routes:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+
+    def test_login_required_endpoints_redirect_anonymous(self):
+        secured_get_routes = [
+            reverse("mis_productos"),
+            reverse("pedidos_vendedor"),
+            reverse("crear_producto"),
+            reverse("checkout"),
+            reverse("checkout_success"),
+            reverse("checkout_cancel"),
+            reverse("portal_usuario"),
+            reverse("mis_compras"),
+            reverse("mis_recibos"),
+            reverse("editar_perfil"),
+            reverse("direcciones_usuario"),
+            reverse("crear_direccion"),
+            reverse("mensajes_comprador"),
+            reverse("metodos_pago"),
+            reverse("agregar_tarjeta"),
+            reverse("agregar_paypal"),
+            reverse("editar_producto", args=[self.product.id]),
+            reverse("borrar_producto", args=[self.product.id]),
+            reverse("cambiar_estado_pedido", args=[1]),
+            reverse("enviar_mensaje_pedido", args=[1]),
+            reverse("editar_direccion", args=[self.address.id]),
+            reverse("eliminar_direccion", args=[self.address.id]),
+            reverse("eliminar_metodo_pago", args=[1]),
+        ]
+        for url in secured_get_routes:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 302)
+                self.assertIn(reverse("login"), response.url)
+
+        secured_post_routes = [
+            "crear_payment_intent",
+            "confirmar_pago_tarjeta",
+            "crear_orden_paypal",
+            "capturar_orden_paypal",
+            "crear_setup_intent",
+            "confirmar_setup_intent",
+            "crear_orden_paypal_setup",
+            "capturar_orden_paypal_setup",
+        ]
+        for name in secured_post_routes:
+            with self.subTest(name=name):
+                response = self.client.post(reverse(name))
+                self.assertEqual(response.status_code, 302)
+                self.assertIn(reverse("login"), response.url)
+
+    @patch("tienda.views.tasks.enviar_correo_confirmacion.delay")
+    @patch("tienda.views.tasks.enviar_correo_bienvenida.delay")
+    def test_register_login_logout_and_verify_flows(self, welcome_delay, confirm_delay):
+        register_response = self.client.post(reverse("register"), data={
+            "name": "Nuevo",
+            "email": "nuevo@example.com",
+            "password": self.password,
+            "password_confirm": self.password,
+        })
+        self.assertEqual(register_response.status_code, 302)
+        confirm_delay.assert_called_once()
+
+        created_user = User.objects.get(email="nuevo@example.com")
+        created_user.registration_status = User.RegisterStatus.ACTIVE
+        created_user.save(update_fields=["registration_status"])
+
+        login_response = self.client.post(reverse("login"), data={
+            "email": "nuevo@example.com",
+            "password": self.password,
+            "remember": "on",
+        })
+        self.assertEqual(login_response.status_code, 302)
+        self.assertEqual(login_response.url, reverse("index"))
+        welcome_delay.assert_called_once()
+
+        logout_response = self.client.get(reverse("logout"))
+        self.assertEqual(logout_response.status_code, 302)
+        self.assertEqual(logout_response.url, reverse("index"))
+
+        verification = VerificationCode.generate(created_user, VerificationCode.VerificationModes.VERIFY_ACCOUNT)
+        verify_response = self.client.get(reverse("verify", args=[verification.code]))
+        self.assertEqual(verify_response.status_code, 302)
+        created_user.refresh_from_db()
+        self.assertEqual(created_user.registration_status, User.RegisterStatus.ACTIVE)
+
+        invalid_verify_response = self.client.get(reverse("verify", args=["codigo-invalido"]))
+        self.assertEqual(invalid_verify_response.status_code, 200)
+
+    @patch("tienda.views.tasks.enviar_correo_recuperacion.delay")
+    def test_password_reset_endpoints(self, recovery_delay):
+        reset_get = self.client.get(reverse("reset_password"))
+        self.assertEqual(reset_get.status_code, 200)
+        reset_post = self.client.post(reverse("reset_password"), data={"email": self.buyer.email})
+        self.assertEqual(reset_post.status_code, 200)
+        recovery_delay.assert_called_once_with(self.buyer.email)
+
+        code = VerificationCode.generate(self.buyer, VerificationCode.VerificationModes.RESET_PASSWORD)
+        phase2_get = self.client.get(reverse("reset_password_phase2", args=[code.code]))
+        self.assertEqual(phase2_get.status_code, 200)
+
+        mismatch = self.client.post(reverse("reset_password_phase2", args=[code.code]), data={
+            "password": "NuevaPassword123!",
+            "verify_password": "DistintaPassword123!",
+        })
+        self.assertEqual(mismatch.status_code, 200)
+
+        success = self.client.post(reverse("reset_password_phase2", args=[code.code]), data={
+            "password": "NuevaPassword123!",
+            "verify_password": "NuevaPassword123!",
+        })
+        self.assertEqual(success.status_code, 302)
+        self.assertTrue(User.objects.get(id=self.buyer.id).check_password("NuevaPassword123!"))
+
+        not_found = self.client.get(reverse("reset_password_phase2", args=["no-existe"]))
+        self.assertEqual(not_found.status_code, 404)
+
+    def test_search_and_suggestions(self):
+        response = self.client.get(reverse("search"), data={"q": "Producto"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Producto test")
+
+        suggestions = self.client.get(reverse("search_suggestions"), data={"q": "Pr"})
+        self.assertEqual(suggestions.status_code, 200)
+        payload = suggestions.json()
+        self.assertTrue(payload["suggestions"])
+
+    def test_cart_endpoints(self):
+        self._login()
+        cart_view = self.client.get(reverse("view_cart"))
+        self.assertEqual(cart_view.status_code, 200)
+
+        add_response = self.client.post(reverse("add_to_cart", args=[self.product.id]), data={"quantity": 2})
+        self.assertEqual(add_response.status_code, 302)
+        item = CartItem.objects.get(cart__user=self.buyer, product=self.product)
+        self.assertEqual(item.quantity, 2)
+
+        update_response = self.client.post(reverse("update_cart_item", args=[item.id]), data={"quantity": 3})
+        self.assertEqual(update_response.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, 3)
+
+        remove_response = self.client.post(reverse("remove_from_cart", args=[item.id]))
+        self.assertEqual(remove_response.status_code, 302)
+        self.assertFalse(CartItem.objects.filter(id=item.id).exists())
+
+        self._create_cart_item(quantity=1)
+        clear_response = self.client.post(reverse("clear_cart"))
+        self.assertEqual(clear_response.status_code, 302)
+        self.assertEqual(CartItem.objects.filter(cart__user=self.buyer).count(), 0)
+
+    def test_seller_panel_endpoints(self):
+        self._login(self.seller)
+        order = Order.objects.create(
+            buyer=self.buyer,
+            shipping_address=self.address,
+            total=12.1,
+            payment_method=Order.PAYMENT_STRIPE,
+        )
+        item = OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            seller=self.seller,
+            quantity=1,
+            unit_price=12.1,
+            total_price=12.1,
+        )
+
+        self.assertEqual(self.client.get(reverse("mis_productos")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("pedidos_vendedor")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("crear_producto")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("editar_producto", args=[self.product.id])).status_code, 200)
+
+        create_response = self.client.post(reverse("crear_producto"), data={
+            "name": "Nuevo producto",
+            "briefdesc": "Breve",
+            "description": "Descripción",
+            "price": "25.50",
+            "stock": "5",
+            "category": str(self.category.id),
+        })
+        self.assertEqual(create_response.status_code, 302)
+        created = Product.objects.get(name="Nuevo producto")
+
+        edit_response = self.client.post(reverse("editar_producto", args=[created.id]), data={
+            "name": "Producto editado",
+            "briefdesc": "Actualizado",
+            "description": "Descripción nueva",
+            "price": "30.00",
+            "stock": "6",
+            "category": str(self.category.id),
+        })
+        self.assertEqual(edit_response.status_code, 302)
+        created.refresh_from_db()
+        self.assertEqual(created.name, "Producto editado")
+
+        status_response = self.client.post(reverse("cambiar_estado_pedido", args=[item.id]), data={
+            "estado": OrderItem.STATUS_PROCESSING,
+        })
+        self.assertEqual(status_response.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.status, OrderItem.STATUS_PROCESSING)
+
+        message_response = self.client.post(reverse("enviar_mensaje_pedido", args=[item.id]), data={"mensaje": "Preparando envío"})
+        self.assertEqual(message_response.status_code, 302)
+        self.assertTrue(OrderMessage.objects.filter(order_item=item, sender=self.seller).exists())
+
+        delete_get = self.client.get(reverse("borrar_producto", args=[created.id]))
+        self.assertEqual(delete_get.status_code, 302)
+        delete_post = self.client.post(reverse("borrar_producto", args=[created.id]))
+        self.assertEqual(delete_post.status_code, 302)
+        self.assertFalse(Product.objects.filter(id=created.id).exists())
+
+    @patch("tienda.views.stripe.PaymentIntent.create")
+    @patch("tienda.views._create_stock_reservation_for_cart")
+    def test_crear_payment_intent_endpoint(self, reservation_mock, create_pi_mock):
+        self._login()
+        self._create_cart_item(quantity=2)
+        reservation_mock.return_value = (MagicMock(id=321), [])
+        create_pi_mock.return_value = MagicMock(client_secret="secret", id="pi_123")
+
+        self.assertEqual(self.client.get(reverse("crear_payment_intent")).status_code, 405)
+        bad_json = self.client.post(reverse("crear_payment_intent"), data="{", content_type="application/json")
+        self.assertEqual(bad_json.status_code, 400)
+
+        missing_address = self._post_json("crear_payment_intent", {})
+        self.assertEqual(missing_address.status_code, 400)
+
+        ok = self._post_json("crear_payment_intent", {"shipping_address_id": self.address.id, "save_card": True})
+        self.assertEqual(ok.status_code, 200)
+        data = ok.json()
+        self.assertEqual(data["client_secret"], "secret")
+        self.assertEqual(data["payment_intent_id"], "pi_123")
+
+    @patch("tienda.views.create_order_from_cart")
+    @patch("tienda.views.stripe.PaymentIntent.retrieve")
+    def test_confirmar_pago_tarjeta_endpoint(self, retrieve_mock, create_order_mock):
+        self._login()
+        self._create_cart_item(quantity=1)
+        session = self.client.session
+        session["selected_shipping_address_id"] = self.address.id
+        session.save()
+
+        retrieve_mock.return_value = MagicMock(status="succeeded")
+        order = Order.objects.create(
+            buyer=self.buyer,
+            shipping_address=self.address,
+            total=12.1,
+            payment_method=Order.PAYMENT_STRIPE,
+        )
+        create_order_mock.return_value = (order, "")
+
+        self.assertEqual(self.client.get(reverse("confirmar_pago_tarjeta")).status_code, 405)
+        self.assertEqual(self.client.post(reverse("confirmar_pago_tarjeta"), data="{", content_type="application/json").status_code, 400)
+        self.assertEqual(self._post_json("confirmar_pago_tarjeta", {}).status_code, 400)
+
+        ok = self._post_json("confirmar_pago_tarjeta", {"payment_intent_id": "pi_ok"})
+        self.assertEqual(ok.status_code, 200)
+        self.assertTrue(ok.json()["success"])
+
+    @patch("tienda.views._paypal_create_order")
+    @patch("tienda.views._create_stock_reservation_for_cart")
+    def test_crear_orden_paypal_endpoint(self, reservation_mock, create_order_mock):
+        self._login()
+        self._create_cart_item(quantity=1)
+        reservation_mock.return_value = (MagicMock(id=555), [])
+        create_order_mock.return_value = {"id": "ORDER123"}
+
+        self.assertEqual(self.client.get(reverse("crear_orden_paypal")).status_code, 405)
+        missing_address = self._post_json("crear_orden_paypal", {})
+        self.assertEqual(missing_address.status_code, 400)
+
+        ok = self._post_json("crear_orden_paypal", {"shipping_address_id": self.address.id})
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(ok.json()["id"], "ORDER123")
+
+    @patch("tienda.views.create_order_from_cart")
+    @patch("tienda.views._paypal_capture_order")
+    def test_capturar_orden_paypal_endpoint(self, capture_mock, create_order_mock):
+        self._login()
+        self._create_cart_item(quantity=1)
+        session = self.client.session
+        session["paypal_order_id"] = "ORDER123"
+        session["selected_shipping_address_id"] = self.address.id
+        session.save()
+
+        order = Order.objects.create(
+            buyer=self.buyer,
+            shipping_address=self.address,
+            total=12.1,
+            payment_method=Order.PAYMENT_PAYPAL,
+        )
+        create_order_mock.return_value = (order, "")
+
+        self.assertEqual(self.client.get(reverse("capturar_orden_paypal")).status_code, 405)
+        self.assertEqual(self.client.post(reverse("capturar_orden_paypal"), data="{", content_type="application/json").status_code, 400)
+        self.assertEqual(self._post_json("capturar_orden_paypal", {}).status_code, 400)
+        self.assertEqual(self._post_json("capturar_orden_paypal", {"orderID": "WRONG"}).status_code, 400)
+
+        capture_mock.return_value = {"status": "APPROVED"}
+        not_completed = self._post_json("capturar_orden_paypal", {"orderID": "ORDER123"})
+        self.assertEqual(not_completed.status_code, 400)
+
+        capture_mock.return_value = {
+            "status": "COMPLETED",
+            "payer": {"email_address": "paypal@example.com", "payer_id": "payer_123"},
+        }
+        ok = self._post_json("capturar_orden_paypal", {"orderID": "ORDER123", "save_paypal": True})
+        self.assertEqual(ok.status_code, 200)
+        self.assertTrue(ok.json()["success"])
+        self.assertTrue(SavedPaymentMethod.objects.filter(user=self.buyer, paypal_email="paypal@example.com").exists())
+
+    @patch("tienda.views.create_order_from_cart")
+    @patch("paypalrestsdk.Payment.find")
+    @patch("paypalrestsdk.configure")
+    def test_paypal_legacy_endpoints(self, configure_mock, find_mock, create_order_mock):
+        self._login()
+        self._create_cart_item(quantity=1)
+
+        self.assertEqual(self.client.get(reverse("create_paypal_payment")).status_code, 405)
+
+        with patch("paypalrestsdk.Payment") as payment_cls, patch("tienda.views._create_stock_reservation_for_cart") as reservation_mock:
+            reservation_mock.return_value = (MagicMock(id=777), [])
+            payment_instance = MagicMock()
+            payment_instance.create.return_value = True
+            payment_instance.id = "PAY-123"
+            payment_instance.links = [MagicMock(rel="approval_url", href="https://paypal.local/approve")]
+            payment_cls.return_value = payment_instance
+            create_payment = self.client.post(reverse("create_paypal_payment"), data={"shipping_address_id": self.address.id})
+            self.assertEqual(create_payment.status_code, 200)
+            self.assertIn("redirect", create_payment.json())
+
+        missing_data = self.client.get(reverse("paypal_execute"))
+        self.assertEqual(missing_data.status_code, 302)
+
+        session = self.client.session
+        session["paypal_payment_id"] = "PAY-123"
+        session["selected_shipping_address_id"] = self.address.id
+        session.save()
+        payment_found = MagicMock()
+        payment_found.execute.return_value = True
+        find_mock.return_value = payment_found
+        order = Order.objects.create(
+            buyer=self.buyer,
+            shipping_address=self.address,
+            total=12.1,
+            payment_method=Order.PAYMENT_PAYPAL,
+        )
+        create_order_mock.return_value = (order, "")
+        execute = self.client.get(reverse("paypal_execute"), data={"PayerID": "payer"})
+        self.assertEqual(execute.status_code, 200)
+
+    @patch("tienda.views.stripe.SetupIntent.create")
+    @patch("tienda.views._get_or_create_stripe_customer")
+    def test_setup_intent_endpoints(self, customer_mock, setup_mock):
+        self._login()
+        self.assertEqual(self.client.get(reverse("metodos_pago")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("agregar_tarjeta")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("agregar_paypal")).status_code, 200)
+
+        self.assertEqual(self.client.get(reverse("crear_setup_intent")).status_code, 405)
+        customer_mock.return_value = "cus_123"
+        setup_mock.return_value = MagicMock(client_secret="seti_secret")
+        setup_response = self.client.post(reverse("crear_setup_intent"))
+        self.assertEqual(setup_response.status_code, 200)
+        self.assertEqual(setup_response.json()["customer_id"], "cus_123")
+
+        self.assertEqual(self.client.get(reverse("confirmar_setup_intent")).status_code, 405)
+        self.assertEqual(self.client.post(reverse("confirmar_setup_intent"), data="{", content_type="application/json").status_code, 400)
+        self.assertEqual(self._post_json("confirmar_setup_intent", {}).status_code, 400)
+
+        with patch("tienda.views.stripe.PaymentMethod.attach"), patch("tienda.views.stripe.PaymentMethod.retrieve") as retrieve_pm:
+            retrieve_pm.return_value = MagicMock(
+                card=MagicMock(brand="visa", last4="4242", exp_month=1, exp_year=2030)
+            )
+            confirm = self._post_json("confirmar_setup_intent", {"payment_method_id": "pm_123"})
+            self.assertEqual(confirm.status_code, 200)
+            self.assertTrue(confirm.json()["success"])
+
+    @patch("tienda.views._paypal_create_order")
+    def test_paypal_setup_endpoints(self, create_order_mock):
+        self._login()
+        self.assertEqual(self.client.get(reverse("crear_orden_paypal_setup")).status_code, 405)
+        create_order_mock.return_value = {"id": "ORDER_SETUP"}
+        create_response = self.client.post(reverse("crear_orden_paypal_setup"))
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(create_response.json()["id"], "ORDER_SETUP")
+
+        self.assertEqual(self.client.get(reverse("capturar_orden_paypal_setup")).status_code, 405)
+        self.assertEqual(self.client.post(reverse("capturar_orden_paypal_setup"), data="{", content_type="application/json").status_code, 400)
+        self.assertEqual(self._post_json("capturar_orden_paypal_setup", {}).status_code, 400)
+
+        with patch("tienda.views._paypal_capture_order") as capture_mock:
+            capture_mock.return_value = {"status": "COMPLETED", "payer": {"email_address": "payer@example.com", "payer_id": "payer_1"}}
+            capture_response = self._post_json("capturar_orden_paypal_setup", {"orderID": "ORDER_SETUP"})
+            self.assertEqual(capture_response.status_code, 200)
+            self.assertTrue(capture_response.json()["success"])
+
+    def test_user_portal_and_addresses_endpoints(self):
+        self._login()
+        order = Order.objects.create(
+            buyer=self.buyer,
+            shipping_address=self.address,
+            total=12.1,
+            payment_method=Order.PAYMENT_STRIPE,
+        )
+        item = OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            seller=self.seller,
+            quantity=1,
+            unit_price=12.1,
+            total_price=12.1,
+        )
+        OrderMessage.objects.create(order_item=item, sender=self.seller, message="Mensaje vendedor")
+
+        self.assertEqual(self.client.get(reverse("portal_usuario")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("mis_compras")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("mis_recibos")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("mensajes_comprador")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("direcciones_usuario")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("crear_direccion")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("editar_direccion", args=[self.address.id])).status_code, 200)
+
+        profile = self.client.post(reverse("editar_perfil"), data={
+            "first_name": "Nombre",
+            "last_name": "Apellido",
+            "email": "buyer-updated@example.com",
+        })
+        self.assertEqual(profile.status_code, 302)
+        self.buyer.refresh_from_db()
+        self.assertEqual(self.buyer.email, "buyer-updated@example.com")
+
+        wrong_current = self.client.post(reverse("cambiar_contrasena"), data={
+            "current_password": "incorrecta",
+            "new_password": "PasswordNueva123!",
+            "confirm_password": "PasswordNueva123!",
+        })
+        self.assertEqual(wrong_current.status_code, 200)
+        changed = self.client.post(reverse("cambiar_contrasena"), data={
+            "current_password": self.password,
+            "new_password": "PasswordNueva123!",
+            "confirm_password": "PasswordNueva123!",
+        })
+        self.assertEqual(changed.status_code, 302)
+        self.buyer.refresh_from_db()
+        self.assertTrue(self.buyer.check_password("PasswordNueva123!"))
+
+        invalid_city = self.client.post(reverse("crear_direccion"), data={
+            "full_name": "Comprador Uno",
+            "address_line_1": "Calle Nueva 3",
+            "city": "Madrid",
+            "postal_code": "04003",
+            "phone": "600000003",
+        })
+        self.assertEqual(invalid_city.status_code, 200)
+        invalid_postal = self.client.post(reverse("crear_direccion"), data={
+            "full_name": "Comprador Uno",
+            "address_line_1": "Calle Nueva 3",
+            "city": "Almería",
+            "postal_code": "28001",
+            "phone": "600000003",
+        })
+        self.assertEqual(invalid_postal.status_code, 200)
+
+        create_ok = self.client.post(reverse("crear_direccion"), data={
+            "full_name": "Comprador Dos",
+            "address_line_1": "Calle Nueva 3",
+            "city": "Almería",
+            "postal_code": "04003",
+            "phone": "600000003",
+            "is_default": "on",
+        })
+        self.assertEqual(create_ok.status_code, 302)
+        new_address = ShippingAddress.objects.get(full_name="Comprador Dos")
+        self.assertEqual(new_address.country, "España")
+
+        edit_ok = self.client.post(reverse("editar_direccion", args=[new_address.id]), data={
+            "full_name": "Comprador Dos Editado",
+            "address_line_1": "Calle Editada 9",
+            "city": "Almería",
+            "postal_code": "04004",
+            "phone": "600000004",
+        })
+        self.assertEqual(edit_ok.status_code, 302)
+        new_address.refresh_from_db()
+        self.assertEqual(new_address.full_name, "Comprador Dos Editado")
+
+        delete_get = self.client.get(reverse("eliminar_direccion", args=[new_address.id]))
+        self.assertEqual(delete_get.status_code, 302)
+        delete_post = self.client.post(reverse("eliminar_direccion", args=[new_address.id]))
+        self.assertEqual(delete_post.status_code, 302)
+        self.assertFalse(ShippingAddress.objects.filter(id=new_address.id).exists())
+
+    def test_delete_payment_method_endpoint(self):
+        self._login()
+        method = SavedPaymentMethod.objects.create(
+            user=self.buyer,
+            method_type=SavedPaymentMethod.TYPE_CARD,
+            label="Visa 4242",
+            stripe_payment_method_id="pm_4242",
+        )
+        self.assertEqual(self.client.get(reverse("eliminar_metodo_pago", args=[method.id])).status_code, 302)
+        with patch("tienda.views.stripe.PaymentMethod.detach"):
+            response = self.client.post(reverse("eliminar_metodo_pago", args=[method.id]))
+            self.assertEqual(response.status_code, 302)
+        self.assertFalse(SavedPaymentMethod.objects.filter(id=method.id).exists())
