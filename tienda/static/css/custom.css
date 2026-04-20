@@ -234,4 +234,8 @@ p.price {
   object-position: center;
 }
 
+.texto-ajustado {
+  overflow-wrap: anywhere;
+}
+
 /*# sourceMappingURL=custom.css.map */
