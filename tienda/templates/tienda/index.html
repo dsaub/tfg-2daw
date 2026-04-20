@@ -2,7 +2,23 @@
 {% load vat_filters %}
 {% block content %}
 <div class="row mt-2">
-    <div class="col-md-2 d-none d-lg-block">
+    <div class="col-12 d-lg-none mb-3">
+        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#mobileCategoriasCollapse" aria-expanded="false" aria-controls="mobileCategoriasCollapse">
+            Categorias
+        </button>
+        <div class="collapse mt-2" id="mobileCategoriasCollapse">
+            <ul class="list-group categorias-lista">
+                {% if categories %}
+                    {% for category in categories %}
+                        <li class="list-group-item categoria-item">
+                            <a href="{% url 'categoria' category.id %}">{{ category.name }}</a>
+                        </li>
+                    {% endfor %}
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-2 d-none d-lg-block">
         <h5 class="categorias-titulo">Categorias</h5>
         <ul class="list-group categorias-lista">
             {% if categories %}
@@ -14,7 +30,7 @@
             {% endif %}
         </ul>
     </div>
-    <div class="col-12 col-md-10 grid">
+    <div class="col-12 col-lg-10 grid">
         {% if products %}
             {% for producto in products %}
                 <div class="card card-producto mt-5" style="width: 18rem;">
