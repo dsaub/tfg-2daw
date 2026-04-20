@@ -51,11 +51,25 @@ p.price {
   background-color: #513CB0 !important;
   color: #FFF;
 }
+.navbar.header .container-fluid {
+  position: relative;
+}
 .navbar.header .navbar-brand img {
   border-radius: 10px;
 }
 .navbar.header .navbar-brand {
   color: #FFF !important;
+}
+.navbar.header .site-title-mobile {
+  color: #FFF;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: calc(100% - 9rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .navbar.header .navbar-toggler {
   border-color: #FFF !important;

@@ -1332,15 +1332,6 @@ class EndpointViewTests(TestCase):
             content_type="application/json",
         )
 
-    def _assert_navbar_responsive_structure(self, response):
-        content = response.content.decode()
-        search_form_index = content.find('id="searchForm"')
-        collapsed_menu_index = content.find('id="navbarContent"')
-        self.assertGreaterEqual(search_form_index, 0)
-        self.assertGreaterEqual(collapsed_menu_index, 0)
-        self.assertLess(search_form_index, collapsed_menu_index)
-        self.assertContains(response, "navbar navbar-expand-lg header")
-
     def test_public_endpoints_render(self):
         public_routes = [
             reverse("home"),
@@ -1367,18 +1358,33 @@ class EndpointViewTests(TestCase):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
 
-    def test_navbar_search_is_visible_outside_collapsible_menu(self):
-        self._login(self.seller)
-        response = self.client.get(reverse("home"))
-        self.assertEqual(response.status_code, 200)
-        self._assert_navbar_responsive_structure(response)
-        self.assertContains(response, "Cerrar Sesión")
+    def test_index_shows_mobile_categories_toggle(self):
+        response = self.client.get(reverse("index"))
 
-    def test_navbar_search_structure_is_kept_for_anonymous_users(self):
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-bs-target="#mobileCategoriasCollapse"')
+        self.assertContains(response, 'id="mobileCategoriasCollapse"')
+        self.assertContains(response, ">Categorías<")
+    def test_home_header_renders_mobile_title_outside_collapsible_menu(self):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
-        self._assert_navbar_responsive_structure(response)
-        self.assertContains(response, "Iniciar Sesión")
+        self.assertContains(response, 'site-title-mobile d-md-none')
+        self.assertContains(response, 'site-title-desktop')
+    def test_home_mobile_welcome_title_centered(self):
+        response = self.client.get(reverse("home"))
+        html = response.content.decode()
+        media_idx = html.find("@media (max-width: 767.98px)")
+        self.assertNotEqual(media_idx, -1)
+
+        rule_idx = html.find(".hero-section h1", media_idx)
+        self.assertNotEqual(rule_idx, -1)
+
+        block_end_idx = html.find("}", rule_idx)
+        self.assertNotEqual(block_end_idx, -1)
+        rule_block = html[rule_idx:block_end_idx]
+
+        self.assertIn("text-align: center", rule_block)
+        self.assertIn("text-wrap: balance", rule_block)
 
     def test_login_required_endpoints_redirect_anonymous(self):
         secured_get_routes = [
