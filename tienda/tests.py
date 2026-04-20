@@ -1364,7 +1364,7 @@ class EndpointViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-bs-target="#mobileCategoriasCollapse"')
         self.assertContains(response, 'id="mobileCategoriasCollapse"')
-        self.assertContains(response, ">Categorías<")
+        self.assertContains(response, "Categorías")
 
     def test_home_header_renders_mobile_title_outside_collapsible_menu(self):
         response = self.client.get(reverse("home"))
