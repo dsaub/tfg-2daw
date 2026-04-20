@@ -1,0 +1,82 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="row">
+    <div class="col-md-12">
+        <article class="legal-container">
+            <h1>Centro de Ayuda</h1>
+            <p>¿Tienes alguna duda? Aquí encontrarás respuesta a las preguntas más frecuentes sobre cómo funciona <strong>Comercialmeria</strong>.</p>
+
+            <section class="legal-section">
+                <h2>🛒 Compras</h2>
+
+                <h3>¿Cómo realizo un pedido?</h3>
+                <p>Busca el producto que deseas, añádelo al carrito y sigue los pasos del proceso de compra. Necesitarás una cuenta registrada y una dirección de envío en la provincia de Almería.</p>
+
+                <h3>¿Qué métodos de pago se aceptan?</h3>
+                <p>Aceptamos <strong>tarjeta de crédito/débito</strong> a través de Stripe y <strong>PayPal</strong>. Todos los pagos están protegidos con cifrado SSL.</p>
+
+                <h3>¿Puedo modificar un pedido tras confirmarlo?</h3>
+                <p>Una vez confirmado el pedido, no es posible modificarlo directamente. Si necesitas hacer cambios antes de que se envíe, contacta con nosotros lo antes posible en <a href="mailto:example@example.com">example@example.com</a>.</p>
+
+                <h3>¿Cuándo recibiré mi pedido?</h3>
+                <p>El plazo de entrega depende del vendedor. Puedes consultar el estado de tu pedido desde <strong>Mi cuenta &rarr; Mis compras</strong>.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>📦 Envíos</h2>
+
+                <h3>¿A qué zonas se realizan envíos?</h3>
+                <p>Comercialmeria envía únicamente dentro de la <strong>provincia de Almería</strong> (códigos postales que empiecen por 04).</p>
+
+                <h3>¿Cuánto cuesta el envío?</h3>
+                <p>Los gastos de envío se calculan en el momento del checkout y dependen del vendedor y la dirección de entrega.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>🔄 Devoluciones</h2>
+
+                <h3>¿Puedo devolver un producto?</h3>
+                <p>Sí. Tienes 14 días naturales desde la recepción para solicitar una devolución. Consulta nuestra <a href="{% url 'devoluciones' %}">Política de Devoluciones</a> para más detalles.</p>
+
+                <h3>¿Cuándo recibiré el reembolso?</h3>
+                <p>Una vez aceptada la devolución, el reembolso se tramita en un máximo de 14 días al mismo método de pago utilizado.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>👤 Mi Cuenta</h2>
+
+                <h3>¿Cómo creo una cuenta?</h3>
+                <p>Haz clic en <strong>Registrarse</strong> en la parte superior de la página, rellena el formulario y verifica tu correo electrónico.</p>
+
+                <h3>He olvidado mi contraseña, ¿qué hago?</h3>
+                <p>Haz clic en <strong>¿Olvidaste tu contraseña?</strong> en la pantalla de inicio de sesión. Recibirás un email con instrucciones para restablecerla.</p>
+
+                <h3>¿Cómo cambio mis datos personales?</h3>
+                <p>Accede a <strong>Mi cuenta &rarr; Editar perfil</strong> para actualizar tu nombre, email o contraseña.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>🏪 Vender en Comercialmeria</h2>
+
+                <h3>¿Cómo puedo vender mis productos?</h3>
+                <p>Regístrate, accede al <strong>Panel Vendedor</strong> desde la barra de navegación y crea tu primer producto. ¡Es gratis y sencillo!</p>
+
+                <h3>¿Hay comisiones?</h3>
+                <p>Actualmente no aplicamos comisiones sobre las ventas. Consulta nuestra sección de <a href="{% url 'terminos' %}">Términos y Condiciones</a> para más información.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>¿No encuentras respuesta?</h2>
+                <p>Escríbenos a <a href="mailto:example@example.com">example@example.com</a> y te ayudaremos en el menor tiempo posible.</p>
+            </section>
+
+            <footer class="legal-footer">
+                <p><small>Última actualización: Marzo 2026. Comercialmeria — Almería, España.</small></p>
+            </footer>
+        </article>
+    </div>
+</div>
+
+{% endblock %}

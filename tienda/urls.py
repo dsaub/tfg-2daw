@@ -25,12 +25,15 @@ urlpatterns = [
     path("cart/remove/<int:item_id>/", views.remove_from_cart, name="remove_from_cart"),
     path("cart/clear/", views.clear_cart, name="clear_cart"),
     path("checkout/", views.checkout, name="checkout"),
-    # Stripe
-    path("config/", views.stripe_config, name="stripe_config"),
-    path("create-checkout-session/", views.create_checkout_session, name="create_checkout_session"),
+    # Stripe Payment Intents (nuevo sistema)
+    path("checkout/crear-payment-intent/", views.crear_payment_intent, name="crear_payment_intent"),
+    path("checkout/confirmar-pago-tarjeta/", views.confirmar_pago_tarjeta, name="confirmar_pago_tarjeta"),
     path("checkout/success/", views.checkout_success, name="checkout_success"),
     path("checkout/cancel/", views.checkout_cancel, name="checkout_cancel"),
-    # PayPal
+    # PayPal Orders API (nuevo sistema)
+    path("paypal/crear-orden/", views.crear_orden_paypal, name="crear_orden_paypal"),
+    path("paypal/capturar-orden/", views.capturar_orden_paypal, name="capturar_orden_paypal"),
+    # PayPal (legacy - mantenido por compatibilidad)
     path("paypal/create-payment/", views.create_paypal_payment, name="create_paypal_payment"),
     path("paypal/execute/", views.paypal_execute, name="paypal_execute"),
     # Portal de usuario
@@ -44,8 +47,24 @@ urlpatterns = [
     path("usuario/direcciones/<int:id>/editar/", views.editar_direccion, name="editar_direccion"),
     path("usuario/direcciones/<int:id>/eliminar/", views.eliminar_direccion, name="eliminar_direccion"),
     path("usuario/mensajes/", views.mensajes_comprador, name="mensajes_comprador"),
+    # Métodos de pago del usuario
+    path("usuario/metodos-pago/", views.metodos_pago, name="metodos_pago"),
+    path("usuario/metodos-pago/agregar-tarjeta/", views.agregar_tarjeta, name="agregar_tarjeta"),
+    path("usuario/metodos-pago/agregar-tarjeta/crear-setup-intent/", views.crear_setup_intent, name="crear_setup_intent"),
+    path("usuario/metodos-pago/agregar-tarjeta/confirmar/", views.confirmar_setup_intent, name="confirmar_setup_intent"),
+    path("usuario/metodos-pago/<int:id>/eliminar/", views.eliminar_metodo_pago, name="eliminar_metodo_pago"),
+    path("usuario/metodos-pago/agregar-paypal/", views.agregar_paypal, name="agregar_paypal"),
+    path("usuario/metodos-pago/agregar-paypal/crear-orden/", views.crear_orden_paypal_setup, name="crear_orden_paypal_setup"),
+    path("usuario/metodos-pago/agregar-paypal/capturar/", views.capturar_orden_paypal_setup, name="capturar_orden_paypal_setup"),
     path("verify/<str:code>", views.verify, name="verify"),
     path("rgpd", views.rgpd, name="rgpd"),
+    path("privacidad", views.rgpd, name="privacidad"),
+    path("devoluciones", views.devoluciones, name="devoluciones"),
+    path("aviso-legal", views.aviso_legal, name="aviso_legal"),
+    path("terminos", views.terminos, name="terminos"),
+    path("cookies", views.cookies, name="cookies"),
+    path("sobre-nosotros", views.sobre_nosotros, name="sobre_nosotros"),
+    path("ayuda", views.ayuda, name="ayuda"),
     path("reset-password", views.reset_password, name="reset_password"),
     path("reset-password-phase2/<str:code>", views.reset_password_phase2, name="reset_password_phase2")
 ]

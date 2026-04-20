@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.db import models
 from django.contrib.auth.models import User, AbstractUser
 from django.utils.crypto import get_random_string
@@ -251,6 +253,41 @@ class OrderMessage(models.Model):
 
     def __str__(self):
         return f"Mensaje de {self.sender} - {self.created_at}"
+
+
+class SavedPaymentMethod(models.Model):
+    """Métodos de pago guardados por el usuario (tarjetas Stripe o cuentas PayPal)."""
+    TYPE_CARD = "card"
+    TYPE_PAYPAL = "paypal"
+    TYPE_CHOICES = [
+        (TYPE_CARD, "Tarjeta"),
+        (TYPE_PAYPAL, "PayPal"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payment_methods")
+    method_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    label = models.CharField(max_length=200, verbose_name="Etiqueta")
+    # Stripe fields
+    stripe_customer_id = models.CharField(max_length=100, blank=True, default="")
+    stripe_payment_method_id = models.CharField(max_length=100, blank=True, default="")
+    # PayPal fields
+    paypal_email = models.CharField(max_length=254, blank=True, default="")
+    paypal_payer_id = models.CharField(max_length=100, blank=True, default="")
+    is_default = models.BooleanField(default=False, verbose_name="Predeterminado")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Método de pago guardado"
+        verbose_name_plural = "Métodos de pago guardados"
+        ordering = ["-is_default", "-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} – {self.label}"
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            SavedPaymentMethod.objects.filter(user=self.user, is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)
 
 
 class ShippingAddress(models.Model):

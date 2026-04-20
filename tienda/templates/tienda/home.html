@@ -128,9 +128,11 @@
         <a href="{% url 'productos' %}" class="btn btn-light btn-lg">
             🛍️ Explorar Productos
         </a>
+        {% if not user.is_authenticated %}
         <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg">
             📝 Registrarse
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -219,6 +221,7 @@
 {% endif %}
 
 <!-- Call to Action -->
+{% if not user.is_authenticated %}
 <div class="row mt-5 mb-5">
     <div class="col-md-12">
         <div style="background-color: #f8f9fa; padding: 40px; border-radius: 8px; text-align: center;">
@@ -232,4 +235,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

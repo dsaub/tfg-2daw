@@ -1,0 +1,80 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="row">
+    <div class="col-md-12">
+        <article class="legal-container">
+            <h1>Política de Cookies</h1>
+            <p>Esta Política de Cookies explica qué son las cookies, cómo las utiliza <strong>Comercialmeria</strong> y cómo puedes gestionarlas, en cumplimiento del artículo 22.2 de la Ley 34/2002 (LSSICE) y el RGPD.</p>
+
+            <section class="legal-section">
+                <h2>1. ¿Qué son las Cookies?</h2>
+                <p>Las cookies son pequeños ficheros de texto que se almacenan en tu dispositivo (ordenador, tablet o móvil) cuando visitas un sitio web. Su función principal es recordar tus preferencias y mejorar tu experiencia de navegación.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>2. Tipos de Cookies que Utilizamos</h2>
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Finalidad</th>
+                            <th>Duración</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>sessionid</code></td>
+                            <td>Técnica / Sesión</td>
+                            <td>Mantiene tu sesión iniciada mientras navegas.</td>
+                            <td>Sesión (se elimina al cerrar el navegador)</td>
+                        </tr>
+                        <tr>
+                            <td><code>csrftoken</code></td>
+                            <td>Seguridad</td>
+                            <td>Protege los formularios contra ataques CSRF.</td>
+                            <td>1 año</td>
+                        </tr>
+                        <tr>
+                            <td><code>cart_id</code></td>
+                            <td>Funcional</td>
+                            <td>Recuerda los productos añadidos al carrito.</td>
+                            <td>Sesión</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p>No utilizamos cookies publicitarias ni de seguimiento de terceros.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>3. Cookies de Terceros</h2>
+                <p>Al procesar pagos, servicios como <strong>Stripe</strong> o <strong>PayPal</strong> pueden instalar sus propias cookies técnicas para garantizar la seguridad de la transacción. Consulta sus políticas de privacidad para más información.</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>4. ¿Cómo Gestionar las Cookies?</h2>
+                <p>Puedes configurar tu navegador para aceptar, rechazar o eliminar cookies en cualquier momento:</p>
+                <ul>
+                    <li><a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener">Google Chrome</a></li>
+                    <li><a href="https://support.mozilla.org/es/kb/habilitar-y-deshabilitar-cookies-sitios-web" target="_blank" rel="noopener">Mozilla Firefox</a></li>
+                    <li><a href="https://support.apple.com/es-es/guide/safari/sfri11471/mac" target="_blank" rel="noopener">Safari</a></li>
+                    <li><a href="https://support.microsoft.com/es-es/windows/eliminar-y-administrar-cookies-168dab11-0753-043d-7c16-ede5947fc64d" target="_blank" rel="noopener">Microsoft Edge</a></li>
+                </ul>
+                <p>Ten en cuenta que deshabilitar ciertas cookies puede afectar a la funcionalidad del sitio (por ejemplo, no podrás mantener la sesión iniciada).</p>
+            </section>
+
+            <section class="legal-section">
+                <h2>5. Consentimiento</h2>
+                <p>Al continuar navegando por nuestra web, aceptas el uso de las cookies técnicas y funcionales descritas anteriormente, necesarias para el correcto funcionamiento del sitio.</p>
+            </section>
+
+            <footer class="legal-footer">
+                <p><small>Última actualización: Marzo 2026. Comercialmeria — Almería, España.</small></p>
+            </footer>
+        </article>
+    </div>
+</div>
+
+{% endblock %}

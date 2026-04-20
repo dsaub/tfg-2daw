@@ -77,7 +77,7 @@
     </style>
     {% block head %}{% endblock %}
 </head>
-<body>
+<body class="d-flex flex-column min-vh-100">
     {% cache 500 sidebar request.user.username %}
     <nav class="navbar navbar-expand-md header" role="banner">
         <div class="container-fluid">
@@ -135,7 +135,7 @@
     </nav>
     {% endcache %}
 
-    <div class="container-fluid" role="main">
+    <div class="container-fluid flex-grow-1 d-flex flex-column" role="main">
         <!-- Mensajes -->
         {% if messages %}
         <div class="row mt-3">
@@ -155,26 +155,39 @@
 
         {% cache 500 footer %}
         <!-- Footer-->
-        <div id="footer" class="row pt-2 pb-2 mt-5" role="contentinfo">
-            <div class="col-md-12 grid">
-                <p class="text-center">Enlace 1</p>
-                <p class="text-center">Enlace 2</p>
-                <p class="text-center">Enlace 3</p>
-                <p class="text-center">Enlace 4</p>
-                <p class="text-center">Enlace 5</p>
-                <p class="text-center">Enlace 6</p>
-                <p class="text-center">Enlace 7</p>
-                <p class="text-center">Enlace 8</p>
-                <p class="text-center">Enlace 9</p>
-                <p class="text-center">Enlace 10</p>
-                <p class="text-center">Enlace 11</p>
-                <p class="text-center">Enlace 12</p>
-                <p class="text-center">Enlace 13</p>
-                <p class="text-center">Enlace 14</p>
-                <p class="text-center">Enlace 15</p>
-                <p class="text-center">Enlace 16</p>
+        <footer id="footer" class="row pt-4 pb-3 mt-auto" role="contentinfo">
+            <div class="col-12">
+                <div class="row text-center gy-3">
+                    <div class="col-12 col-md-4">
+                        <h6 class="fw-semibold text-uppercase mb-2">Información Legal</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li><a href="{% url 'privacidad' %}" class="footer-link">Política de Privacidad</a></li>
+                            <li><a href="{% url 'aviso_legal' %}" class="footer-link">Aviso Legal</a></li>
+                            <li><a href="{% url 'terminos' %}" class="footer-link">Términos y Condiciones</a></li>
+                            <li><a href="{% url 'cookies' %}" class="footer-link">Política de Cookies</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <h6 class="fw-semibold text-uppercase mb-2">Compras</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li><a href="{% url 'devoluciones' %}" class="footer-link">Política de Devoluciones</a></li>
+                            <li><a href="{% url 'ayuda' %}" class="footer-link">Centro de Ayuda</a></li>
+                            <li><a href="{% url 'ayuda' %}#envios" class="footer-link">Información de Envíos</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <h6 class="fw-semibold text-uppercase mb-2">Comercialmeria</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li><a href="{% url 'sobre_nosotros' %}" class="footer-link">Sobre Nosotros</a></li>
+                            <li><a href="{% url 'mis_productos' %}" class="footer-link">Vende con Nosotros</a></li>
+                            <li><a href="mailto:example@example.com" class="footer-link">Contacto</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <hr class="mt-3 mb-2">
+                <p class="text-center mb-0" style="font-size: 0.85rem;">&copy; 2026 Comercialmeria — Comercio local en Almería, España</p>
             </div>
-        </div>
+        </footer>
         {% endcache %}
     </div>
     {% cache 500 scripts %}

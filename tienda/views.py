@@ -4,7 +4,7 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode
+from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode, SavedPaymentMethod
 from . import tasks
 from .vars import (
     PAGE_SIZE,
@@ -28,6 +28,7 @@ import unicodedata
 import json
 import random, string
 import logging
+import requests
 # Create your views here.
 
 
@@ -35,6 +36,13 @@ logger = logging.getLogger("tienda")
 audit_logger = logging.getLogger("tienda.audit")
 STOCK_RESERVATION_SESSION_KEY = "stock_reservation_id"
 STOCK_RESERVATION_PAYMENT_SESSION_KEY = "stock_reservation_payment_method"
+
+
+def _invalidate_product_cache(product_ids):
+    unique_product_ids = {product_id for product_id in product_ids if product_id is not None}
+    if not unique_product_ids:
+        return
+    cache.delete_many([f"product_{product_id}" for product_id in unique_product_ids])
 
 
 def _normalize_location_text(value: str) -> str:
@@ -89,6 +97,88 @@ def _get_client_ip(request: HttpRequest) -> str:
         return forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "")
 
+
+# ==================== PAYPAL ORDERS API v2 HELPERS ====================
+
+def _get_paypal_base_url() -> str:
+    mode = getattr(settings, "PAYPAL_MODE", "sandbox")
+    if mode == "live":
+        return "https://api-m.paypal.com"
+    return "https://api-m.sandbox.paypal.com"
+
+
+def _get_paypal_access_token() -> str:
+    """Obtiene un access token de la API de PayPal."""
+    url = f"{_get_paypal_base_url()}/v1/oauth2/token"
+    response = requests.post(
+        url,
+        auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_CLIENT_SECRET),
+        data={"grant_type": "client_credentials"},
+        timeout=15,
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+def _paypal_create_order(amount_eur: Decimal) -> dict:
+    """Crea una orden PayPal y retorna el diccionario de respuesta con id y approve_link."""
+    token = _get_paypal_access_token()
+    url = f"{_get_paypal_base_url()}/v2/checkout/orders"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    payload = {
+        "intent": "CAPTURE",
+        "purchase_units": [
+            {
+                "amount": {
+                    "currency_code": "EUR",
+                    "value": format(amount_eur, ".2f"),
+                }
+            }
+        ],
+        "application_context": {
+            "brand_name": "Comercialmeria",
+            "shipping_preference": "NO_SHIPPING",
+            "user_action": "PAY_NOW",
+        },
+    }
+    response = requests.post(url, headers=headers, json=payload, timeout=15)
+    response.raise_for_status()
+    return response.json()
+
+
+def _paypal_capture_order(order_id: str) -> dict:
+    """Captura una orden PayPal aprobada por el comprador."""
+    token = _get_paypal_access_token()
+    url = f"{_get_paypal_base_url()}/v2/checkout/orders/{order_id}/capture"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    response = requests.post(url, headers=headers, json={}, timeout=15)
+    response.raise_for_status()
+    return response.json()
+
+
+# ==================== STRIPE CUSTOMER HELPER ====================
+
+def _get_or_create_stripe_customer(user) -> str:
+    """Devuelve el stripe_customer_id del usuario, creando uno nuevo si es necesario."""
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    existing = SavedPaymentMethod.objects.filter(
+        user=user,
+        method_type=SavedPaymentMethod.TYPE_CARD,
+        stripe_customer_id__gt="",
+    ).first()
+    if existing:
+        return existing.stripe_customer_id
+    customer = stripe.Customer.create(
+        email=user.email,
+        name=(f"{user.first_name} {user.last_name}".strip()) or user.username,
+    )
+    return customer.id
 
 def get_price_with_vat_decimal(price) -> Decimal:
     """Retorna un precio con IVA aplicado y redondeado a 2 decimales."""
@@ -442,6 +532,8 @@ def _create_stock_reservation_for_cart(request: HttpRequest, cart_items, payment
             for item in cart_items
         ])
 
+    _invalidate_product_cache(product_ids)
+
     return reservation, []
 
 
@@ -592,6 +684,8 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             product_row = product_map.get(item.product_id)
             product_row.stock -= item.quantity
             product_row.save(update_fields=["stock"])
+
+        _invalidate_product_cache(product_ids)
 
         cart.items.all().delete()
 
@@ -763,10 +857,11 @@ def pedidos_vendedor(request: HttpRequest):
     pedidos = OrderItem.objects.filter(seller=request.user).select_related(
         'order', 'product', 'order__buyer', 'order__shipping_address'
     ).prefetch_related('messages__sender').order_by('-created_at')
+    total_pedidos_por_enviar = pedidos.exclude(status=OrderItem.STATUS_SHIPPED).count()
 
     return render(request, "tienda/pedidos_vendedor.html", {
         "pedidos": pedidos,
-        "total_pedidos": pedidos.count()
+        "total_pedidos": total_pedidos_por_enviar
     })
 
 
@@ -865,7 +960,10 @@ def crear_producto(request: HttpRequest):
                 name=f"{name}_principal",
                 image=primary_image_file
             )
-        
+        if stock > 4294967295:
+            messages.error(request, "No se puede tener mas de 4294967295 existencias. Por favor, intentelo de nuevo")
+            categories = Category.objects.all()
+            return render(request, "tienda/crear_producto.html", {"categories": categories})
         # Crear producto
         producto = Product.objects.create(
             name=name,
@@ -877,6 +975,7 @@ def crear_producto(request: HttpRequest):
             primary_image=primary_image,
             creator=request.user
         )
+        _invalidate_product_cache([producto.id])
         
         # Agregar imágenes secundarias si se proporcionan
         if secondary_images_files:
@@ -934,6 +1033,13 @@ def editar_producto(request: HttpRequest, id: int):
             stock = int(stock)
             if stock < 0:
                 raise ValueError("El stock no puede ser negativo")
+            if stock > 4294967295:
+                messages.error(request, "No se puede tener mas de 4294967295 de stock.")
+                categories = Category.objects.all()
+                return render(request, "tienda/editar_producto.html", {
+                    "categories": categories,
+                    "producto": producto
+                })
         except ValueError:
             messages.error(request, "El stock debe ser un número entero válido.")
             categories = Category.objects.all()
@@ -967,6 +1073,7 @@ def editar_producto(request: HttpRequest, id: int):
             producto.primary_image = primary_image
 
         producto.save()
+        _invalidate_product_cache([producto.id])
 
         if secondary_images_files:
             producto.secondary_images.clear()
@@ -996,6 +1103,7 @@ def borrar_producto(request: HttpRequest, id: int):
 
     producto = get_object_or_404(Product, id=id, creator=request.user)
     nombre = producto.name
+    _invalidate_product_cache([producto.id])
     producto.delete()
     messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
     return redirect("mis_productos")
@@ -1007,12 +1115,18 @@ def checkout(request: HttpRequest):
     active_reservation_ids = _get_active_reservation_ids_for_request(request)
     stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
     addresses = ShippingAddress.objects.filter(user=request.user)
+    saved_cards = SavedPaymentMethod.objects.filter(user=request.user, method_type=SavedPaymentMethod.TYPE_CARD)
+    saved_paypal = SavedPaymentMethod.objects.filter(user=request.user, method_type=SavedPaymentMethod.TYPE_PAYPAL).first()
     return render(request, "tienda/checkout.html", {
         "cart": cart,
         "cart_items": cart_items,
         "addresses": addresses,
         "stock_issues": stock_issues,
         "reservation_minutes": STOCK_RESERVATION_MINUTES,
+        "saved_cards": saved_cards,
+        "saved_paypal": saved_paypal,
+        "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+        "paypal_client_id": settings.PAYPAL_CLIENT_ID,
     })
 
 @csrf_exempt
@@ -1096,7 +1210,7 @@ def create_checkout_session(request: HttpRequest):
         return JsonResponse({"sessionId": session.id})
     except Exception as e:
         logger.exception("STRIPE_CHECKOUT_SESSION_ERROR user_id=%s error=%s", request.user.id, str(e))
-        return JsonResponse({"error": f"Error al crear sesión de pago: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Error al crear la sesión de pago. Por favor inténtalo de nuevo."}, status=500)
 
 
 @login_required
@@ -1155,7 +1269,28 @@ def search(request: HttpRequest):
     })
 
 
-# ==================== PAYPAL PAYMENT ====================
+def search_suggestions(request: HttpRequest):
+    """API AJAX que retorna sugerencias de búsqueda en JSON"""
+    query = request.GET.get('q', '').strip()
+    suggestions = []
+    
+    if query and len(query) >= 2:
+        products = Product.objects.filter(
+            models.Q(name__icontains=query) | 
+            models.Q(briefdesc__icontains=query)
+        ).values_list('name', 'id', 'price', 'primary_image_id').distinct()[:8]
+        
+        for name, product_id, price, image_id in products:
+            suggestions.append({
+                'name': name,
+                'id': product_id,
+                'price': float(price),
+            })
+    
+    return JsonResponse({'suggestions': suggestions})
+
+
+
 
 @login_required
 def create_paypal_payment(request: HttpRequest):
@@ -1340,26 +1475,521 @@ def paypal_execute(request: HttpRequest):
         return redirect("checkout")
 
 
-def search_suggestions(request: HttpRequest):
-    """API AJAX que retorna sugerencias de búsqueda en JSON"""
-    query = request.GET.get('q', '').strip()
-    suggestions = []
-    
-    if query and len(query) >= 2:  # Mínimo 2 caracteres para sugerir
-        # Buscar en nombre (primario) y descripción
-        products = Product.objects.filter(
-            models.Q(name__icontains=query) | 
-            models.Q(briefdesc__icontains=query)
-        ).values_list('name', 'id', 'price', 'primary_image_id').distinct()[:8]  # Máximo 8 sugerencias
-        
-        for name, product_id, price, image_id in products:
-            suggestions.append({
-                'name': name,
-                'id': product_id,
-                'price': float(price)
-            })
-    
-    return JsonResponse({'suggestions': suggestions})
+# ==================== STRIPE PAYMENT INTENTS ====================
+
+@login_required
+def crear_payment_intent(request: HttpRequest):
+    """
+    Crea un Stripe PaymentIntent para el carrito actual.
+    Acepta JSON: { shipping_address_id, saved_payment_method_id (opcional), save_card (bool) }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+
+    shipping_address = _get_selected_shipping_address(request)
+    if shipping_address is None:
+        return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
+
+    cart = get_or_create_cart(request)
+    cart_items = list(cart.items.select_related("product"))
+
+    if not cart_items:
+        return JsonResponse({"error": "El carrito está vacío"}, status=400)
+
+    active_reservation_ids = _get_active_reservation_ids_for_request(request)
+    stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
+    if stock_issues:
+        return JsonResponse({"error": _build_stock_issue_message(stock_issues[0])}, status=400)
+
+    reservation, reservation_issues = _create_stock_reservation_for_cart(
+        request, cart_items, StockReservation.PAYMENT_STRIPE,
+    )
+    if reservation is None:
+        return JsonResponse({"error": reservation_issues[0]}, status=400)
+
+    try:
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+
+        order_total = sum(
+            get_price_with_vat_decimal(item.product.price) * item.quantity
+            for item in cart_items
+        )
+        amount_cents = int(
+            (order_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100
+        )
+
+        pi_params = {
+            "amount": amount_cents,
+            "currency": "eur",
+            "automatic_payment_methods": {"enabled": False},
+            "payment_method_types": ["card"],
+        }
+
+        # If using a saved card, attach customer + payment_method
+        saved_pm_id = payload.get("saved_payment_method_id")
+        if saved_pm_id:
+            saved_pm = SavedPaymentMethod.objects.filter(
+                id=saved_pm_id,
+                user=request.user,
+                method_type=SavedPaymentMethod.TYPE_CARD,
+            ).first()
+            if saved_pm is None:
+                return JsonResponse({"error": "Método de pago no encontrado."}, status=400)
+            pi_params["customer"] = saved_pm.stripe_customer_id
+            pi_params["payment_method"] = saved_pm.stripe_payment_method_id
+
+        payment_intent = stripe.PaymentIntent.create(**pi_params)
+
+        request.session[STOCK_RESERVATION_SESSION_KEY] = reservation.id
+        request.session[STOCK_RESERVATION_PAYMENT_SESSION_KEY] = StockReservation.PAYMENT_STRIPE
+        request.session["selected_shipping_address_id"] = shipping_address.id
+        request.session["stripe_save_card"] = bool(payload.get("save_card", False))
+
+        return JsonResponse({
+            "client_secret": payment_intent.client_secret,
+            "payment_intent_id": payment_intent.id,
+        })
+
+    except Exception as e:
+        logger.exception("CREATE_PAYMENT_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al crear el pago. Por favor inténtalo de nuevo."}, status=500)
+
+
+@login_required
+def confirmar_pago_tarjeta(request: HttpRequest):
+    """
+    Verificar que el PaymentIntent fue exitoso y crear el pedido.
+    Acepta JSON: { payment_intent_id, payment_method_id (si nueva tarjeta) }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+
+    payment_intent_id = payload.get("payment_intent_id")
+    if not payment_intent_id:
+        return JsonResponse({"error": "Falta el ID del intento de pago"}, status=400)
+
+    try:
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+    except Exception as e:
+        logger.exception("RETRIEVE_PAYMENT_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al verificar el pago"}, status=500)
+
+    if payment_intent.status != "succeeded":
+        return JsonResponse({"error": f"El pago no fue completado (estado: {payment_intent.status})"}, status=400)
+
+    shipping_address_id = request.session.get("selected_shipping_address_id")
+    shipping_address = ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
+    reservation = _get_session_stock_reservation(request, StockReservation.PAYMENT_STRIPE)
+
+    order, order_error = create_order_from_cart(
+        request,
+        Order.PAYMENT_STRIPE,
+        payment_intent_id,
+        shipping_address,
+        stock_reservation=reservation,
+    )
+
+    if order is None:
+        return JsonResponse({"error": order_error}, status=400)
+
+    # Optionally save the card for future use
+    save_card = request.session.pop("stripe_save_card", False)
+    new_payment_method_id = payload.get("payment_method_id")
+    if save_card and new_payment_method_id:
+        try:
+            customer_id = _get_or_create_stripe_customer(request.user)
+            pm = stripe.PaymentMethod.retrieve(new_payment_method_id)
+            stripe.PaymentMethod.attach(new_payment_method_id, customer=customer_id)
+            card = pm.card
+            label = f"{card.brand.capitalize()} •••• {card.last4}"
+            SavedPaymentMethod.objects.create(
+                user=request.user,
+                method_type=SavedPaymentMethod.TYPE_CARD,
+                label=label,
+                stripe_customer_id=customer_id,
+                stripe_payment_method_id=new_payment_method_id,
+                is_default=not SavedPaymentMethod.objects.filter(user=request.user).exists(),
+            )
+        except Exception as e:
+            logger.warning("SAVE_CARD_ERROR user_id=%s error=%s", request.user.id, str(e))
+
+    if "selected_shipping_address_id" in request.session:
+        del request.session["selected_shipping_address_id"]
+    _clear_stock_reservation_session(request)
+
+    return JsonResponse({"success": True, "order_id": order.id, "transaction_code": order.transaction_code})
+
+
+# ==================== PAYPAL ORDERS API ====================
+
+@login_required
+def crear_orden_paypal(request: HttpRequest):
+    """
+    Crea una orden de PayPal con el total del carrito actual (Orders API v2).
+    Acepta JSON: { shipping_address_id }
+    Retorna: { id: paypal_order_id }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    shipping_address = _get_selected_shipping_address(request)
+    if shipping_address is None:
+        return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
+
+    cart = get_or_create_cart(request)
+    cart_items = list(cart.items.select_related("product"))
+
+    if not cart_items:
+        return JsonResponse({"error": "El carrito está vacío"}, status=400)
+
+    active_reservation_ids = _get_active_reservation_ids_for_request(request)
+    stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
+    if stock_issues:
+        return JsonResponse({"error": _build_stock_issue_message(stock_issues[0])}, status=400)
+
+    reservation, reservation_issues = _create_stock_reservation_for_cart(
+        request, cart_items, StockReservation.PAYMENT_PAYPAL,
+    )
+    if reservation is None:
+        return JsonResponse({"error": reservation_issues[0]}, status=400)
+
+    try:
+        order_total = sum(
+            get_price_with_vat_decimal(item.product.price) * item.quantity
+            for item in cart_items
+        )
+        order_total = order_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        paypal_order = _paypal_create_order(order_total)
+        paypal_order_id = paypal_order.get("id")
+
+        request.session["paypal_order_id"] = paypal_order_id
+        request.session["selected_shipping_address_id"] = shipping_address.id
+        request.session[STOCK_RESERVATION_SESSION_KEY] = reservation.id
+        request.session[STOCK_RESERVATION_PAYMENT_SESSION_KEY] = StockReservation.PAYMENT_PAYPAL
+
+        return JsonResponse({"id": paypal_order_id})
+
+    except Exception as e:
+        logger.exception("CREAR_ORDEN_PAYPAL_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al crear la orden de PayPal. Por favor inténtalo de nuevo."}, status=500)
+
+
+@login_required
+def capturar_orden_paypal(request: HttpRequest):
+    """
+    Captura una orden de PayPal aprobada y crea el pedido en nuestra BD.
+    Acepta JSON: { orderID }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+
+    paypal_order_id = payload.get("orderID")
+    if not paypal_order_id:
+        return JsonResponse({"error": "Falta el ID de la orden de PayPal"}, status=400)
+
+    # Verify this order belongs to this session
+    session_order_id = request.session.get("paypal_order_id")
+    if session_order_id != paypal_order_id:
+        logger.warning(
+            "PAYPAL_ORDER_MISMATCH user_id=%s session=%s received=%s",
+            request.user.id, session_order_id, paypal_order_id,
+        )
+        return JsonResponse({"error": "ID de orden inválido"}, status=400)
+
+    try:
+        capture_data = _paypal_capture_order(paypal_order_id)
+    except Exception as e:
+        logger.exception("CAPTURAR_ORDEN_PAYPAL_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al capturar el pago de PayPal. Por favor inténtalo de nuevo."}, status=500)
+
+    capture_status = capture_data.get("status")
+    if capture_status != "COMPLETED":
+        return JsonResponse({"error": f"El pago de PayPal no fue completado (estado: {capture_status})"}, status=400)
+
+    # Extract payer info to optionally save as payment method
+    payer = capture_data.get("payer", {})
+    payer_email = payer.get("email_address", "")
+    payer_id = payer.get("payer_id", "")
+
+    shipping_address_id = request.session.get("selected_shipping_address_id")
+    shipping_address = ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
+    reservation = _get_session_stock_reservation(request, StockReservation.PAYMENT_PAYPAL)
+
+    order, order_error = create_order_from_cart(
+        request,
+        Order.PAYMENT_PAYPAL,
+        paypal_order_id,
+        shipping_address,
+        stock_reservation=reservation,
+    )
+
+    if order is None:
+        return JsonResponse({"error": order_error}, status=400)
+
+    # Save payer info if they want to store the PayPal account (offered in the template)
+    save_paypal = payload.get("save_paypal", False)
+    if save_paypal and payer_email:
+        already_saved = SavedPaymentMethod.objects.filter(
+            user=request.user,
+            method_type=SavedPaymentMethod.TYPE_PAYPAL,
+            paypal_email=payer_email,
+        ).exists()
+        if not already_saved:
+            SavedPaymentMethod.objects.create(
+                user=request.user,
+                method_type=SavedPaymentMethod.TYPE_PAYPAL,
+                label=payer_email,
+                paypal_email=payer_email,
+                paypal_payer_id=payer_id,
+                is_default=not SavedPaymentMethod.objects.filter(user=request.user).exists(),
+            )
+
+    if "paypal_order_id" in request.session:
+        del request.session["paypal_order_id"]
+    if "selected_shipping_address_id" in request.session:
+        del request.session["selected_shipping_address_id"]
+    _clear_stock_reservation_session(request)
+
+    return JsonResponse({
+        "success": True,
+        "order_id": order.id,
+        "transaction_code": order.transaction_code,
+        "payer_email": payer_email,
+    })
+
+
+# ==================== MÉTODOS DE PAGO DEL USUARIO ====================
+
+@login_required
+def metodos_pago(request: HttpRequest):
+    """Lista los métodos de pago guardados del usuario."""
+    metodos = SavedPaymentMethod.objects.filter(user=request.user)
+    return render(request, "tienda/metodos_pago.html", {
+        "metodos": metodos,
+        "cards_exist": metodos.filter(method_type=SavedPaymentMethod.TYPE_CARD).exists(),
+        "paypal_exist": metodos.filter(method_type=SavedPaymentMethod.TYPE_PAYPAL).exists(),
+    })
+
+
+@login_required
+def agregar_tarjeta(request: HttpRequest):
+    """Página para añadir una nueva tarjeta usando Stripe SetupIntent."""
+    return render(request, "tienda/agregar_tarjeta.html", {
+        "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+    })
+
+
+@login_required
+def crear_setup_intent(request: HttpRequest):
+    """
+    Crea un Stripe SetupIntent y retorna el client_secret para que el frontend
+    pueda montar el Card Element y confirmar sin realizar un cobro.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+    try:
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        customer_id = _get_or_create_stripe_customer(request.user)
+        setup_intent = stripe.SetupIntent.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+        )
+        return JsonResponse({
+            "client_secret": setup_intent.client_secret,
+            "customer_id": customer_id,
+        })
+    except Exception as e:
+        logger.exception("CREATE_SETUP_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al iniciar el proceso de configuración. Por favor inténtalo de nuevo."}, status=500)
+
+
+@login_required
+def confirmar_setup_intent(request: HttpRequest):
+    """
+    Tras la confirmación del SetupIntent en el frontend, guarda la tarjeta.
+    Acepta JSON: { payment_method_id, setup_intent_id }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+
+    payment_method_id = payload.get("payment_method_id")
+    if not payment_method_id:
+        return JsonResponse({"error": "Falta el ID del método de pago"}, status=400)
+
+    try:
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        customer_id = _get_or_create_stripe_customer(request.user)
+
+        # Attach the PaymentMethod to the customer
+        try:
+            stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+        except stripe.error.InvalidRequestError as attach_err:
+            # The payment method may already be attached to a customer
+            pm_check = stripe.PaymentMethod.retrieve(payment_method_id)
+            if pm_check.get("customer") == customer_id:
+                # Already attached to this same customer – continue normally
+                pass
+            else:
+                logger.warning(
+                    "CONFIRMAR_SETUP_INTENT_ALREADY_ATTACHED user_id=%s pm=%s error=%s",
+                    request.user.id, payment_method_id, str(attach_err),
+                )
+                return JsonResponse(
+                    {"error": "Este método de pago ya está asociado a otra cuenta. "
+                              "Por favor, usa una tarjeta diferente."},
+                    status=400,
+                )
+
+        pm = stripe.PaymentMethod.retrieve(payment_method_id)
+        card = pm.card
+        label = f"{card.brand.capitalize()} •••• {card.last4} (exp. {card.exp_month:02d}/{card.exp_year})"
+
+        # Avoid saving duplicates in our database
+        existing = SavedPaymentMethod.objects.filter(
+            user=request.user,
+            stripe_payment_method_id=payment_method_id,
+        ).first()
+        if existing:
+            return JsonResponse({"success": True, "label": existing.label, "id": existing.id})
+
+        has_existing = SavedPaymentMethod.objects.filter(user=request.user).exists()
+        saved = SavedPaymentMethod.objects.create(
+            user=request.user,
+            method_type=SavedPaymentMethod.TYPE_CARD,
+            label=label,
+            stripe_customer_id=customer_id,
+            stripe_payment_method_id=payment_method_id,
+            is_default=not has_existing,
+        )
+
+        return JsonResponse({"success": True, "label": label, "id": saved.id})
+
+    except Exception as e:
+        logger.exception("CONFIRMAR_SETUP_INTENT_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al guardar la tarjeta. Por favor inténtalo de nuevo."}, status=500)
+
+
+@login_required
+def eliminar_metodo_pago(request: HttpRequest, id: int):
+    """Elimina un método de pago guardado del usuario."""
+    if request.method != "POST":
+        messages.error(request, "Acción no permitida.")
+        return redirect("metodos_pago")
+
+    metodo = get_object_or_404(SavedPaymentMethod, id=id, user=request.user)
+
+    # If it's a Stripe card, detach from Stripe too
+    if metodo.method_type == SavedPaymentMethod.TYPE_CARD and metodo.stripe_payment_method_id:
+        try:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            stripe.PaymentMethod.detach(metodo.stripe_payment_method_id)
+        except Exception as e:
+            logger.warning("DETACH_PAYMENT_METHOD_ERROR user_id=%s error=%s", request.user.id, str(e))
+
+    metodo.delete()
+    messages.success(request, "Método de pago eliminado correctamente.")
+    return redirect("metodos_pago")
+
+
+@login_required
+def agregar_paypal(request: HttpRequest):
+    """Página para guardar una cuenta de PayPal como método de pago (usa un pago de verificación de 0.01 €)."""
+    return render(request, "tienda/agregar_paypal.html", {
+        "paypal_client_id": settings.PAYPAL_CLIENT_ID,
+    })
+
+
+@login_required
+def crear_orden_paypal_setup(request: HttpRequest):
+    """
+    Crea una orden PayPal de 0.01 € para verificar/guardar la cuenta.
+    Retorna { id: paypal_order_id }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+    try:
+        paypal_order = _paypal_create_order(Decimal("0.01"))
+        return JsonResponse({"id": paypal_order.get("id")})
+    except Exception as e:
+        logger.exception("CREAR_ORDEN_PAYPAL_SETUP_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al iniciar la verificación de PayPal. Por favor inténtalo de nuevo."}, status=500)
+
+
+@login_required
+def capturar_orden_paypal_setup(request: HttpRequest):
+    """
+    Captura la orden de verificación de PayPal y guarda la cuenta del usuario.
+    Acepta JSON: { orderID }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+
+    paypal_order_id = payload.get("orderID")
+    if not paypal_order_id:
+        return JsonResponse({"error": "Falta el ID de la orden"}, status=400)
+
+    try:
+        capture_data = _paypal_capture_order(paypal_order_id)
+    except Exception as e:
+        logger.exception("CAPTURAR_PAYPAL_SETUP_ERROR user_id=%s error=%s", request.user.id, str(e))
+        return JsonResponse({"error": "Error al verificar la cuenta de PayPal. Por favor inténtalo de nuevo."}, status=500)
+
+    if capture_data.get("status") != "COMPLETED":
+        return JsonResponse({"error": "No se pudo verificar la cuenta de PayPal"}, status=400)
+
+    payer = capture_data.get("payer", {})
+    payer_email = payer.get("email_address", "")
+    payer_id = payer.get("payer_id", "")
+
+    if not payer_email:
+        return JsonResponse({"error": "No se pudo obtener el email de PayPal"}, status=400)
+
+    already_saved = SavedPaymentMethod.objects.filter(
+        user=request.user,
+        method_type=SavedPaymentMethod.TYPE_PAYPAL,
+        paypal_email=payer_email,
+    ).exists()
+
+    if not already_saved:
+        has_existing = SavedPaymentMethod.objects.filter(user=request.user).exists()
+        SavedPaymentMethod.objects.create(
+            user=request.user,
+            method_type=SavedPaymentMethod.TYPE_PAYPAL,
+            label=payer_email,
+            paypal_email=payer_email,
+            paypal_payer_id=payer_id,
+            is_default=not has_existing,
+        )
+        return JsonResponse({"success": True, "email": payer_email, "already_existed": False})
+    else:
+        return JsonResponse({"success": True, "email": payer_email, "already_existed": True})
 
 
 # ==================== PORTAL DE USUARIO ====================
@@ -1632,6 +2262,24 @@ def reset_password(request: HttpRequest):
 
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
+
+def devoluciones(request: HttpRequest):
+    return render(request, "tienda/devoluciones.html", {})
+
+def aviso_legal(request: HttpRequest):
+    return render(request, "tienda/aviso_legal.html", {})
+
+def terminos(request: HttpRequest):
+    return render(request, "tienda/terminos.html", {})
+
+def cookies(request: HttpRequest):
+    return render(request, "tienda/cookies.html", {})
+
+def sobre_nosotros(request: HttpRequest):
+    return render(request, "tienda/sobre_nosotros.html", {})
+
+def ayuda(request: HttpRequest):
+    return render(request, "tienda/ayuda.html", {})
 
 def reset_password(request: HttpRequest):
     if request.method == "GET":
