@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.db import models
 from django.contrib.auth.models import User, AbstractUser
 from django.utils.crypto import get_random_string
