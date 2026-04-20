@@ -45,10 +45,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Preparar tag de imagen
+        run: |
+          TAG=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
       - name: Build y Push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          # Aquí usamos el nombre de la rama dinámicamente
-          tags: ghcr.io/dsaub/proyecto-mvc:${{ github.ref_name }}
+          # Sanitizamos el nombre de la rama (reemplazamos / por -)
+          tags: ghcr.io/dsaub/proyecto-mvc:${{ env.IMAGE_TAG }}
