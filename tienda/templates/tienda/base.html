@@ -95,13 +95,15 @@
                         decoding="async">
                 </picture>
             </a>
+
+            <span class="navbar-text fw-semibold site-title-mobile d-md-none">Comercialmeria</span>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             
             <div class="collapse navbar-collapse" id="navbarContent">
-                <span class="navbar-text fw-semibold me-3" style="color: #ffffff">Comercialmeria</span>
+                <span class="navbar-text fw-semibold me-3 d-none d-md-inline site-title-desktop" style="color: #ffffff">Comercialmeria</span>
                 <!-- Barra de búsqueda con sugerencias -->
                 <form class="search-suggestions-container" method="GET" action="{% url 'search' %}" role="search" id="searchForm">
                     <div class="input-group">
