@@ -274,3 +274,8 @@ p.price {
   color: #6c757d;
 }
 
+.texto-ajustado {
+  overflow-wrap: anywhere;
+}
+
+/*# sourceMappingURL=custom.css.map */
