@@ -1358,6 +1358,22 @@ class EndpointViewTests(TestCase):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
 
+    def test_navbar_search_is_visible_outside_collapsible_menu(self):
+        self._login(self.seller)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        search_form_index = content.find('id="searchForm"')
+        collapsed_menu_index = content.find('id="navbarContent"')
+        self.assertGreaterEqual(search_form_index, 0)
+        self.assertGreaterEqual(collapsed_menu_index, 0)
+        self.assertLess(search_form_index, collapsed_menu_index)
+
+        self.assertContains(response, "navbar navbar-expand-lg header")
+        self.assertContains(response, "search-suggestions-container order-3 order-lg-0 w-100 w-lg-auto mt-2 mt-lg-0")
+        self.assertContains(response, "navbar-nav ms-lg-auto d-flex align-items-lg-center gap-2")
+
     def test_login_required_endpoints_redirect_anonymous(self):
         secured_get_routes = [
             reverse("mis_productos"),
