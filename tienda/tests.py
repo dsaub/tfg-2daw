@@ -1364,7 +1364,7 @@ class EndpointViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-bs-target="#mobileCategoriasCollapse"')
         self.assertContains(response, 'id="mobileCategoriasCollapse"')
-        self.assertContains(response, ">Categorias<")
+        self.assertContains(response, ">Categorías<")
 
     def test_login_required_endpoints_redirect_anonymous(self):
         secured_get_routes = [
