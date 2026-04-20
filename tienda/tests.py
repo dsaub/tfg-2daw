@@ -1358,11 +1358,21 @@ class EndpointViewTests(TestCase):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
 
-    def test_home_includes_mobile_centering_rule_for_welcome_title(self):
+    def test_home_mobile_welcome_title_centered(self):
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "@media (max-width: 767.98px)")
-        self.assertContains(response, ".hero-section h1")
-        self.assertContains(response, "text-align: center;")
+        html = response.content.decode()
+        media_idx = html.find("@media (max-width: 767.98px)")
+        self.assertNotEqual(media_idx, -1)
+
+        rule_idx = html.find(".hero-section h1", media_idx)
+        self.assertNotEqual(rule_idx, -1)
+
+        block_end_idx = html.find("}", rule_idx)
+        self.assertNotEqual(block_end_idx, -1)
+        rule_block = html[rule_idx:block_end_idx]
+
+        self.assertIn("text-align: center", rule_block)
+        self.assertIn("text-wrap: balance", rule_block)
 
     def test_login_required_endpoints_redirect_anonymous(self):
         secured_get_routes = [
