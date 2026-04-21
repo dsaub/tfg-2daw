@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
@@ -1376,16 +1377,12 @@ class EndpointViewTests(TestCase):
     def test_mobile_site_title_css_keeps_title_pinned_to_header_row(self):
         css_path = Path(__file__).resolve().parent / "static" / "css" / "custom.css"
         css_content = css_path.read_text(encoding="utf-8")
+        selector_match = re.search(r"\.navbar\.header \.site-title-mobile\s*\{(?P<body>[^}]*)\}", css_content, re.DOTALL)
+        self.assertIsNotNone(selector_match)
 
-        rule_start = css_content.find(".navbar.header .site-title-mobile")
-        self.assertNotEqual(rule_start, -1)
-
-        rule_end = css_content.find("}", rule_start)
-        self.assertNotEqual(rule_end, -1)
-        rule_block = css_content[rule_start:rule_end]
-
-        self.assertIn("top: calc(var(--bs-navbar-padding-y) + 20px);", rule_block)
-        self.assertIn("transform: translate(-50%, -50%);", rule_block)
+        rule_block = selector_match.group("body")
+        self.assertRegex(rule_block, r"top:\s*calc\(var\(--bs-navbar-padding-y\)\s*\+\s*20px\);")
+        self.assertRegex(rule_block, r"transform:\s*translate\(-50%,\s*-50%\);")
     def test_home_mobile_welcome_title_centered(self):
         response = self.client.get(reverse("home"))
         html = response.content.decode()
