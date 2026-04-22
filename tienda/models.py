@@ -25,6 +25,11 @@ class User(AbstractUser):
         choices = RegisterStatus.choices,
         default = RegisterStatus.CONFIRMATION_REQUIRED
     )
+    def __dict__(self):
+        return {
+            "username": self.username,
+            "fullname": self.get_full_name()
+        }
 
 class VerificationCode(models.Model):
     class VerificationModes(models.TextChoices):
@@ -55,6 +60,11 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def __dict__(self):
+        return {
+            "name": self.name
+        }
 
 class Image(models.Model):
     name = models.CharField(max_length=200, default="")
@@ -63,6 +73,13 @@ class Image(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def __dict__(self):
+        return {
+            "name": self.name,
+            "image": self.image.url,
+            "alt": self.alt
+        }
 
 class Product(models.Model):
     name = models.CharField(max_length=200, default="")
@@ -85,6 +102,19 @@ class Product(models.Model):
     def get_vat_amount(self):
         """Retorna la cantidad de IVA"""
         return round(self.price * VAT_RATE, 2)
+    
+    def __dict__(self):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "briefdesc": self.briefdesc,
+            "price": self.price,
+            "stock": self.stock,
+            "category": dict(self.category),
+            "primary_image": self.primary_image,
+            "secondary_images": [dict(secondary_image) for secondary_image in self.secondary_images],
+            "creator": dict(self.creator)
+        }
 
 
 class StockReservation(models.Model):
