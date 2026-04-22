@@ -25,7 +25,7 @@ class User(AbstractUser):
         choices = RegisterStatus.choices,
         default = RegisterStatus.CONFIRMATION_REQUIRED
     )
-    def __dict__(self):
+    def to_dict(self):
         return {
             "username": self.username,
             "fullname": self.get_full_name()
@@ -61,7 +61,7 @@ class Category(models.Model):
     def __str__(self):
         return self.name
     
-    def __dict__(self):
+    def to_dict(self):
         return {
             "name": self.name
         }
@@ -74,7 +74,7 @@ class Image(models.Model):
     def __str__(self):
         return self.name
     
-    def __dict__(self):
+    def to_dict(self):
         return {
             "name": self.name,
             "image": self.image.url,
@@ -103,17 +103,17 @@ class Product(models.Model):
         """Retorna la cantidad de IVA"""
         return round(self.price * VAT_RATE, 2)
     
-    def __dict__(self):
+    def to_dict(self):
         return {
             "name": self.name,
             "description": self.description,
             "briefdesc": self.briefdesc,
             "price": self.price,
             "stock": self.stock,
-            "category": dict(self.category),
+            "category": self.category.to_dict(),
             "primary_image": self.primary_image,
-            "secondary_images": [dict(secondary_image) for secondary_image in self.secondary_images],
-            "creator": dict(self.creator)
+            "secondary_images": [secondary_image.to_dict() for secondary_image in self.secondary_images],
+            "creator": self.creator.to_dict()
         }
 
 
