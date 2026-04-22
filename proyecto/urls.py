@@ -19,11 +19,13 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from tienda import views as tienda_views
+from tienda.api import api
 
 urlpatterns = [
     path('', tienda_views.home, name='home'),
     path('admin/', admin.site.urls),
-    path('tienda/', include('tienda.urls'))
+    path('tienda/', include('tienda.urls')),
+    path('api/', api.urls)
 ]
 
 if settings.DEBUG:
