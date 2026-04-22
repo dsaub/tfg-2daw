@@ -9,4 +9,4 @@ def hola(request):
 @api.get("/products")
 def products(request):
     productos = Product.objects.all()
-    return [dict(producto) for producto in productos]
+    return [producto.to_dict() for producto in productos]
