@@ -59,7 +59,7 @@
                 {% if item.product.stock > 0 %}
                 {{ item.product.stock }}
                 {% else %}
-                <span class="text-danger"><span aria-hidden="true">✗</span> Sin stock</span>
+                <span class="text-danger" role="status"><span aria-hidden="true">✗</span> Sin stock</span>
                 {% endif %}
               </td>
               <td class="price">{{ item.get_subtotal_with_vat|format_price }} €</td>

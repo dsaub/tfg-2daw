@@ -41,9 +41,9 @@
         </div>
         <div class="mt-3">
             {% if product.stock > 0 %}
-            <span class="badge bg-success"><span aria-hidden="true">✓</span> Stock disponible: {{ product.stock }}</span>
+            <span class="badge bg-success" role="status"><span aria-hidden="true">✓</span> Stock disponible: {{ product.stock }}</span>
             {% else %}
-            <span class="badge bg-danger"><span aria-hidden="true">✗</span> Sin stock</span>
+            <span class="badge bg-danger" role="status"><span aria-hidden="true">✗</span> Sin stock</span>
             {% endif %}
         </div>
         
