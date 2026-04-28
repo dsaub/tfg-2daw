@@ -256,11 +256,12 @@ document.getElementById('pay-card-btn').addEventListener('click', async () => {
     const addressId = document.getElementById('shipping-address').value;
     if (!addressId) {
         const cardErrors = document.getElementById('card-errors');
-        cardErrors.textContent = 'Selecciona una dirección de envío para continuar.';
+        if (cardErrors) cardErrors.textContent = 'Selecciona una dirección de envío para continuar.';
         return;
     }
 
-    document.getElementById('card-errors').textContent = '';
+    const cardErrorsEl = document.getElementById('card-errors');
+    if (cardErrorsEl) cardErrorsEl.textContent = '';
     const btn = document.getElementById('pay-card-btn');
     const spinner = document.getElementById('card-spinner');
     btn.disabled = true;
@@ -339,11 +340,14 @@ paypal.Buttons({
         const addressId = document.getElementById('shipping-address').value;
         if (!addressId) {
             const paypalErrors = document.getElementById('paypal-errors');
-            paypalErrors.textContent = 'Selecciona una dirección de envío para continuar.';
-            paypalErrors.classList.remove('d-none');
+            if (paypalErrors) {
+                paypalErrors.textContent = 'Selecciona una dirección de envío para continuar.';
+                paypalErrors.classList.remove('d-none');
+            }
             return Promise.reject(new Error('Sin dirección'));
         }
-        document.getElementById('paypal-errors').classList.add('d-none');
+        const paypalErrorsEl = document.getElementById('paypal-errors');
+        if (paypalErrorsEl) paypalErrorsEl.classList.add('d-none');
         const resp = await fetch('{% url "crear_orden_paypal" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
@@ -366,8 +370,10 @@ paypal.Buttons({
     },
     onError: (err) => {
         const paypalErrors = document.getElementById('paypal-errors');
-        paypalErrors.textContent = 'Error en el pago con PayPal: ' + err;
-        paypalErrors.classList.remove('d-none');
+        if (paypalErrors) {
+            paypalErrors.textContent = 'Error en el pago con PayPal: ' + err;
+            paypalErrors.classList.remove('d-none');
+        }
     },
 }).render('#paypal-button-container');
 {% endif %}
