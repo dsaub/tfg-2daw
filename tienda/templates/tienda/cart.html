@@ -51,7 +51,7 @@
               <td>
                 <form method="post" action="{% url 'update_cart_item' item.id %}" class="d-flex align-items-center" style="max-width: 150px;">
                   {% csrf_token %}
-                  <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.product.stock }}" class="form-control form-control-sm me-2" style="width: 70px;">
+                  <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.product.stock }}" class="form-control form-control-sm me-2" style="width: 70px;" aria-label="Cantidad para {{ item.product.name }}">
                   <button type="submit" class="btn btn-sm btn-primary">Actualizar</button>
                 </form>
               </td>
