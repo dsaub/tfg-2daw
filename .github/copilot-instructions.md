@@ -35,6 +35,7 @@ Templates use Django's inheritance pattern:
 - **Image uploads**: Organized in `tienda/static/media/images/` via `upload_to='images/'` in ImageField
 - **Access**: Media files served automatically in development via Django's static file handler
 - **Image model**: Located in [tienda/models.py](tienda/models.py) with `ImageField(upload_to='images/')`
+- **S3 mode**: if `S3_ENABLE=True` (case-insensitive), static and media switch to S3 storages instead of the local filesystem; Nginx should proxy the app only and the browser should load asset URLs from the bucket or CDN
 
 ## Shipping Restrictions
 - **Zona de envío**: Solo se vende/envía dentro de la provincia de Almería
