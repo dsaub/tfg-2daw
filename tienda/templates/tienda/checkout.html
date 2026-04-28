@@ -141,8 +141,8 @@
                 <!-- Tarjeta tab -->
                 <div id="pane-card" class="payment-tab-content active">
                     {% if saved_cards %}
-                    <div class="mb-3">
-                        <p class="fw-semibold">Tarjetas guardadas:</p>
+                    <fieldset class="mb-3">
+                        <legend class="fw-semibold fs-6 mb-2">Selección de tarjeta</legend>
                         {% for card in saved_cards %}
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="saved_card_choice" id="card-{{ card.id }}" value="{{ card.id }}" data-pm-id="{{ card.stripe_payment_method_id }}" {% if card.is_default %}checked{% endif %}>
@@ -156,7 +156,7 @@
                             <input class="form-check-input" type="radio" name="saved_card_choice" id="card-new" value="new">
                             <label class="form-check-label" for="card-new">Usar nueva tarjeta</label>
                         </div>
-                    </div>
+                    </fieldset>
                     {% endif %}
 
                     <div id="new-card-section" {% if saved_cards %}style="display:none;"{% endif %}>
