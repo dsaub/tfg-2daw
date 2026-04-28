@@ -196,6 +196,7 @@
                             Guardar esta cuenta de PayPal para futuras compras
                         </label>
                     </div>
+                    <div id="paypal-errors" class="alert alert-danger d-none mt-2" role="alert"></div>
                     <div id="paypal-button-container"></div>
                     {% if not addresses or stock_issues %}
                     <div class="alert alert-warning mt-2">Selecciona una dirección de envío válida para activar el pago.</div>
@@ -254,10 +255,12 @@ document.getElementById('pay-card-btn').addEventListener('click', async () => {
 
     const addressId = document.getElementById('shipping-address').value;
     if (!addressId) {
-        alert('Selecciona una dirección de envío para continuar.');
+        const cardErrors = document.getElementById('card-errors');
+        cardErrors.textContent = 'Selecciona una dirección de envío para continuar.';
         return;
     }
 
+    document.getElementById('card-errors').textContent = '';
     const btn = document.getElementById('pay-card-btn');
     const spinner = document.getElementById('card-spinner');
     btn.disabled = true;
@@ -335,9 +338,12 @@ paypal.Buttons({
     createOrder: async () => {
         const addressId = document.getElementById('shipping-address').value;
         if (!addressId) {
-            alert('Selecciona una dirección de envío para continuar.');
+            const paypalErrors = document.getElementById('paypal-errors');
+            paypalErrors.textContent = 'Selecciona una dirección de envío para continuar.';
+            paypalErrors.classList.remove('d-none');
             return Promise.reject(new Error('Sin dirección'));
         }
+        document.getElementById('paypal-errors').classList.add('d-none');
         const resp = await fetch('{% url "crear_orden_paypal" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
@@ -359,7 +365,9 @@ paypal.Buttons({
         showSuccess(result.transaction_code);
     },
     onError: (err) => {
-        alert('Error en el pago con PayPal: ' + err);
+        const paypalErrors = document.getElementById('paypal-errors');
+        paypalErrors.textContent = 'Error en el pago con PayPal: ' + err;
+        paypalErrors.classList.remove('d-none');
     },
 }).render('#paypal-button-container');
 {% endif %}
