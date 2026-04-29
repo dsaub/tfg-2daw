@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from django.utils.encoding import iri_to_uri
-from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
+from storages.backends.s3 import S3Storage
 
 
 def _use_local_asset_urls() -> bool:
@@ -14,7 +14,7 @@ def _local_asset_url(prefix: str, name: str) -> str:
     return iri_to_uri(f'/{prefix}/{name.lstrip("/")}')
 
 
-class StaticStorage(S3ManifestStaticStorage):
+class StaticStorage(S3Storage):
     location = 'static'
     default_acl = 'public-read'
     querystring_auth = False
