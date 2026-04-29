@@ -1,15 +1,22 @@
 .skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  background: #513CB0;
-  color: #fff;
-  padding: 8px 16px;
-  font-weight: 600;
-  z-index: 10000;
+  position: fixed;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  color: #513CB0;
+  padding: 8px 24px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  z-index: 10001;
   text-decoration: none;
-  border-radius: 0 0 4px 0;
-  transition: top 0.2s;
+  border-radius: 0 0 8px 8px;
+  border: 2px solid #513CB0;
+  border-top: none;
+  box-shadow: 0 4px 12px rgba(81, 60, 176, 0.25);
+  transition: top 0.2s ease;
+  outline: none;
+  white-space: nowrap;
 }
 .skip-link:focus,
 .skip-link:focus-visible {
