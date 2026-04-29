@@ -82,6 +82,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-#g((q@lvnkt(j6)2(gvtn0px)r
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool('DEBUG', True)
 S3_ENABLE = env_bool('S3_ENABLE', False)
+S3_USE_LOCAL_URLS = env_bool('S3_USE_LOCAL_URLS', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', [
     '192.168.1.142',
@@ -427,5 +428,3 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 USE_X_FORWARDED_HOST = True
 SECURE_REFERER_POLICY = "strict-origin-when-cross-origin"
-
-print(f"DEBUG: ALLOWED_HOSTS is {ALLOWED_HOSTS}")
