@@ -16,6 +16,7 @@ from .vars import (
 )
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -704,6 +705,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
     return order, ""
 
 
+@require_POST
 def add_to_cart(request: HttpRequest, product_id: int):
     """Agrega un producto al carrito"""
     try:
