@@ -2258,13 +2258,6 @@ def verify(request: HttpRequest, code: str):
         return HttpResponse("<h1>Error</h1><p>No existe el codigo de verificación</p>")
 
 
-def reset_password(request: HttpRequest):
-    if request.user.is_authenticated:
-        return redirect("index")
-    
-        
-    return render(request, "tienda/reset_password", {})
-
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
 
