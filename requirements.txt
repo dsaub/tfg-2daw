@@ -44,4 +44,3 @@ wcwidth==0.6.0
 whitenoise==6.12.0
 fpdf2==2.8.7
 psycopg2-binary==2.9.11
-django-ninja==1.6.2
