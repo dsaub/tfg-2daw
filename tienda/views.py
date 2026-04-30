@@ -2317,6 +2317,7 @@ def reset_password_phase2(request: HttpRequest, code: str):
         user = ver_code.user
         user.set_password(password)
         user.save()
+        ver_code.delete() # Delete Verification code after changing password
         messages.success(request, "Se ha cambiado la contraseña!")
         return redirect(reverse("index"))
         
