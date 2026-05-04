@@ -111,9 +111,9 @@ class Product(models.Model):
             "price": self.price,
             "stock": self.stock,
             "category": self.category.to_dict(),
-            "primary_image": self.primary_image.to_dict(),
+            "primary_image": self.primary_image.to_dict() if self.primary_image else None,
             "secondary_images": [secondary_image.to_dict() for secondary_image in self.secondary_images.all()],
-            "creator": self.creator.to_dict()
+            "creator": self.creator.to_dict() if self.creator else None
         }
 
 
