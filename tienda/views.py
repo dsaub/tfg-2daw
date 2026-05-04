@@ -241,6 +241,23 @@ def login(request: HttpRequest):
         # Autenticar usuario
         user = authenticate(request, username=username, password=password)
         if user is None:
+            data: str = cache.get(f"tries_login_{username}")
+            logins: int
+            if data is None:
+                logins = int(data)
+            else:
+                logins = 0
+            
+            if logins >= 5:
+                # Si ha fallado 5 intentos de login...
+                audit_logger.info(
+                    "LOGIN_FAILED email=%s reason=rate_limited", username
+                )
+                messages.error(request, "Has sufrido de Rate Limit por fallar 5 veces la contraseña")
+                return render(request, "tienda/login.html")
+
+            logins+=1
+            cache.set(f"tries_login_{username}", str(logins), 600)
             messages.error(request, "Correo electrónico o contraseña incorrectos.")
             return render(request, "tienda/login.html") 
         user = User.objects.get(username=user.username)
