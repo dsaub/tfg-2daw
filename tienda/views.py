@@ -240,7 +240,7 @@ def login(request: HttpRequest):
         
         # Autenticar usuario
         user = authenticate(request, username=username, password=password)
-        if user is None: # Bug de error 500 en caso de fallar la contra
+        if user is None:
             messages.error(request, "Correo electrónico o contraseña incorrectos.")
             return render(request, "tienda/login.html") 
         user = User.objects.get(username=user.username)
