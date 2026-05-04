@@ -37,7 +37,7 @@ def enviar_correo_recuperacion(email: str):
     try:
         usuario = User.objects.get(email=email)
     except User.DoesNotExist as e:
-        print("ERROR: User does not exist, Cancelling task!")
+        usuario = None
     if usuario is not None:
         ver_code = VerificationCode.objects.create(
             code_mode = VerificationCode.VerificationModes.RESET_PASSWORD,
@@ -58,7 +58,7 @@ def enviar_correo_recuperacion(email: str):
 
         send_hemail(email, "Reset de Contraseña", html_content, "Estas reseteando la contraseña...")
     else:
-
+        print("User does not exist, Cancelling TASK.")
 
 # Purchased items should be a list of dictionary, the dictionary must follow this tags: amount, product name, price (each)
 @shared_task
