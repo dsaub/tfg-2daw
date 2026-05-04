@@ -26,5 +26,7 @@ urlpatterns = [
     path('tienda/', include('tienda.urls'))
 ]
 
-if settings.DEBUG and not settings.S3_ENABLE:
+if settings.DEBUG and (
+    not settings.S3_ENABLE or getattr(settings, 'S3_USE_LOCAL_URLS', False)
+):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
