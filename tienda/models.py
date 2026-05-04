@@ -46,7 +46,7 @@ class VerificationCode(models.Model):
     
     def generate(user: User, code_mode: str) -> VerificationCode:
         while True:
-            code = "".join(random.choices(string.ascii_letters+string.digits+string.punctuation, k=64))
+            code = "".join(random.choices(string.ascii_letters+string.digits, k=64))
             if not VerificationCode.objects.filter(code=code).exists():
                 return VerificationCode.objects.create(
                     code = code,
