@@ -1,3 +1,28 @@
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  color: #513CB0;
+  padding: 8px 24px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  z-index: 10001;
+  text-decoration: none;
+  border-radius: 0 0 8px 8px;
+  border: 2px solid #513CB0;
+  border-top: none;
+  box-shadow: 0 4px 12px rgba(81, 60, 176, 0.25);
+  transition: top 0.2s ease;
+  outline: none;
+  white-space: nowrap;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 0;
+}
+
 @media (min-width: 1250px) {
   .grid {
     display: grid;
@@ -63,8 +88,9 @@ p.price {
 .navbar.header .site-title-mobile {
   color: #FFF;
   position: absolute;
+  top: calc(var(--bs-navbar-padding-y) + 20px);
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   margin: 0;
   max-width: calc(100% - 9rem);
   overflow: hidden;

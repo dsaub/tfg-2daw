@@ -50,8 +50,11 @@
             transition: background-color 0.2s;
         }
         
-        .search-suggestion-item:hover {
+        .search-suggestion-item:hover,
+        .search-suggestion-item.active {
             background-color: #f8f9fa;
+            outline: 2px solid #0d6efd;
+            outline-offset: -2px;
         }
         
         .search-suggestion-item:last-child {
@@ -78,6 +81,7 @@
     {% block head %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100">
+    <a href="#main-content" class="skip-link">Saltar al contenido</a>
     {% cache 500 sidebar request.user.username %}
     <nav class="navbar navbar-expand-md header" role="banner">
         <div class="container-fluid">
@@ -107,10 +111,10 @@
                 <!-- Barra de búsqueda con sugerencias -->
                 <form class="search-suggestions-container" method="GET" action="{% url 'search' %}" role="search" id="searchForm">
                     <div class="input-group">
-                        <input class="form-control" type="search" name="q" id="searchInput" placeholder="Buscar productos..." aria-label="Buscar" autocomplete="off">
-                        <button class="btn btn-outline-primary" type="submit">🔍</button>
+                        <input class="form-control" type="search" name="q" id="searchInput" placeholder="Buscar productos..." aria-label="Buscar" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="searchSuggestions" aria-activedescendant="" aria-haspopup="listbox">
+                        <button class="btn btn-outline-primary" type="submit" aria-label="Buscar productos">🔍 Buscar</button>
                     </div>
-                    <div class="search-suggestions" id="searchSuggestions"></div>
+                    <div class="search-suggestions" id="searchSuggestions" role="listbox" aria-label="Sugerencias de búsqueda"></div>
                 </form>
                 
                 <div class="navbar-nav ms-auto d-flex align-items-md-center gap-2 flex-wrap" role="navigation">
@@ -137,7 +141,7 @@
     </nav>
     {% endcache %}
 
-    <div class="container-fluid flex-grow-1 d-flex flex-column" role="main">
+    <div id="main-content" class="container-fluid flex-grow-1 d-flex flex-column" role="main">
         <!-- Mensajes -->
         {% if messages %}
         <div class="row mt-3">
@@ -201,6 +205,35 @@
         const searchSuggestions = document.getElementById('searchSuggestions');
         const searchForm = document.getElementById('searchForm');
         let searchTimeout;
+        let currentFocusIndex = -1;
+
+        // Helpers para gestionar el estado ARIA del combobox
+        function openSuggestions() {
+            searchSuggestions.classList.add('show');
+            searchInput.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeSuggestions() {
+            searchSuggestions.classList.remove('show');
+            searchInput.setAttribute('aria-expanded', 'false');
+            searchInput.setAttribute('aria-activedescendant', '');
+            currentFocusIndex = -1;
+        }
+
+        function updateFocus(options) {
+            options.forEach((option, index) => {
+                const active = index === currentFocusIndex;
+                option.classList.toggle('active', active);
+                option.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            if (currentFocusIndex >= 0) {
+                const activeOption = options[currentFocusIndex];
+                searchInput.setAttribute('aria-activedescendant', activeOption.id);
+                activeOption.scrollIntoView({ block: 'nearest' });
+            } else {
+                searchInput.setAttribute('aria-activedescendant', '');
+            }
+        }
 
         // Escuchar cambios en el input
         searchInput.addEventListener('input', function() {
@@ -208,7 +241,7 @@
             const query = this.value.trim();
 
             if (query.length < 2) {
-                searchSuggestions.classList.remove('show');
+                closeSuggestions();
                 return;
             }
 
@@ -216,6 +249,31 @@
             searchTimeout = setTimeout(() => {
                 fetchSuggestions(query);
             }, 300);
+        });
+
+        // Navegación por teclado (ArrowDown/ArrowUp/Enter/Escape)
+        searchInput.addEventListener('keydown', function(event) {
+            const options = searchSuggestions.querySelectorAll('[role="option"]');
+            if (!options.length || !searchSuggestions.classList.contains('show')) {
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                currentFocusIndex = Math.min(currentFocusIndex + 1, options.length - 1);
+                updateFocus(options);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                currentFocusIndex = Math.max(currentFocusIndex - 1, -1);
+                updateFocus(options);
+            } else if (event.key === 'Enter' && currentFocusIndex >= 0) {
+                event.preventDefault();
+                const selected = options[currentFocusIndex];
+                window.location.href = selected.dataset.href;
+            } else if (event.key === 'Escape') {
+                closeSuggestions();
+                searchInput.focus();
+            }
         });
 
         // Función para obtener sugerencias del servidor
@@ -227,33 +285,37 @@
                 })
                 .catch(error => {
                     console.error('Error fetching suggestions:', error);
-                    searchSuggestions.classList.remove('show');
+                    closeSuggestions();
                 });
         }
 
         // Función para mostrar las sugerencias
         function displaySuggestions(suggestions, query) {
+            currentFocusIndex = -1;
             if (suggestions.length === 0) {
                 searchSuggestions.innerHTML = '<div class="search-suggestion-item text-muted">No se encontraron productos</div>';
-                searchSuggestions.classList.add('show');
+                openSuggestions();
                 return;
             }
 
             let html = '';
-            suggestions.forEach(suggestion => {
+            suggestions.forEach((suggestion, index) => {
                 // Resaltar la coincidencia en el nombre
                 const highlightedName = highlightMatch(suggestion.name, query);
                 const priceWithVAT = (suggestion.price * 1.21).toFixed(2);
                 html += `
-                    <a href="/tienda/producto/${suggestion.id}" class="search-suggestion-item text-decoration-none">
+                    <div class="search-suggestion-item" role="option" id="search-option-${index}"
+                         aria-selected="false" tabindex="-1"
+                         data-href="/tienda/producto/${suggestion.id}"
+                         onclick="window.location.href=this.dataset.href">
                         <span class="suggestion-name">${highlightedName}</span>
                         <span class="suggestion-price">€${priceWithVAT}</span>
-                    </a>
+                    </div>
                 `;
             });
 
             searchSuggestions.innerHTML = html;
-            searchSuggestions.classList.add('show');
+            openSuggestions();
         }
 
         // Función para resaltar el texto que coincide
@@ -265,19 +327,19 @@
         // Cerrar sugerencias cuando se hace clic fuera
         document.addEventListener('click', function(event) {
             if (!searchForm.contains(event.target)) {
-                searchSuggestions.classList.remove('show');
+                closeSuggestions();
             }
         });
 
         // Cerrar sugerencias al enviar el formulario
         searchForm.addEventListener('submit', function() {
-            searchSuggestions.classList.remove('show');
+            closeSuggestions();
         });
 
         // Mostrar sugerencias al hacer clic en el input (si hay texto)
         searchInput.addEventListener('focus', function() {
             if (this.value.trim().length >= 2 && searchSuggestions.innerHTML) {
-                searchSuggestions.classList.add('show');
+                openSuggestions();
             }
         });
     </script>

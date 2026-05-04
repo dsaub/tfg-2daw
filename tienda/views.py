@@ -16,6 +16,7 @@ from .vars import (
 )
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -239,6 +240,9 @@ def login(request: HttpRequest):
         
         # Autenticar usuario
         user = authenticate(request, username=username, password=password)
+        if user is None: # Bug de error 500 en caso de fallar la contra
+            messages.error(request, "Correo electrónico o contraseña incorrectos.")
+            return render(request, "tienda/login.html") 
         user = User.objects.get(username=user.username)
         if user.registration_status == "CR":
             audit_logger.info(
@@ -704,6 +708,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
     return order, ""
 
 
+@require_POST
 def add_to_cart(request: HttpRequest, product_id: int):
     """Agrega un producto al carrito"""
     try:
@@ -2253,13 +2258,6 @@ def verify(request: HttpRequest, code: str):
         return HttpResponse("<h1>Error</h1><p>No existe el codigo de verificación</p>")
 
 
-def reset_password(request: HttpRequest):
-    if request.user.is_authenticated:
-        return redirect("index")
-    
-        
-    return render(request, "tienda/reset_password", {})
-
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
 
@@ -2312,6 +2310,7 @@ def reset_password_phase2(request: HttpRequest, code: str):
         user = ver_code.user
         user.set_password(password)
         user.save()
+        ver_code.delete() # Delete Verification code after changing password
         messages.success(request, "Se ha cambiado la contraseña!")
         return redirect(reverse("index"))
         

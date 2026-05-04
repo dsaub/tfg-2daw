@@ -25,6 +25,11 @@ class User(AbstractUser):
         choices = RegisterStatus.choices,
         default = RegisterStatus.CONFIRMATION_REQUIRED
     )
+    def to_dict(self):
+        return {
+            "username": self.username,
+            "fullname": self.get_full_name()
+        }
 
 class VerificationCode(models.Model):
     class VerificationModes(models.TextChoices):
@@ -41,7 +46,7 @@ class VerificationCode(models.Model):
     
     def generate(user: User, code_mode: str) -> VerificationCode:
         while True:
-            code = "".join(random.choices(string.ascii_letters+string.digits+string.punctuation))
+            code = "".join(random.choices(string.ascii_letters+string.digits, k=64))
             if not VerificationCode.objects.filter(code=code).exists():
                 return VerificationCode.objects.create(
                     code = code,
@@ -55,6 +60,11 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def to_dict(self):
+        return {
+            "name": self.name
+        }
 
 class Image(models.Model):
     name = models.CharField(max_length=200, default="")
@@ -63,6 +73,13 @@ class Image(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "image": self.image.url,
+            "alt": self.alt
+        }
 
 class Product(models.Model):
     name = models.CharField(max_length=200, default="")
@@ -85,6 +102,19 @@ class Product(models.Model):
     def get_vat_amount(self):
         """Retorna la cantidad de IVA"""
         return round(self.price * VAT_RATE, 2)
+    
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "briefdesc": self.briefdesc,
+            "price": self.price,
+            "stock": self.stock,
+            "category": self.category.to_dict(),
+            "primary_image": self.primary_image.to_dict() if self.primary_image else None,
+            "secondary_images": [secondary_image.to_dict() for secondary_image in self.secondary_images.all()],
+            "creator": self.creator.to_dict() if self.creator else None
+        }
 
 
 class StockReservation(models.Model):

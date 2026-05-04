@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+import re
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
@@ -1371,6 +1373,16 @@ class EndpointViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'site-title-mobile d-md-none')
         self.assertContains(response, 'site-title-desktop')
+
+    def test_mobile_site_title_css_keeps_title_pinned_to_header_row(self):
+        css_path = Path(__file__).resolve().parent / "static" / "css" / "custom.css"
+        css_content = css_path.read_text(encoding="utf-8")
+        selector_match = re.search(r"\.navbar\.header \.site-title-mobile\s*\{(?P<body>[^}]*)\}", css_content, re.DOTALL)
+        self.assertIsNotNone(selector_match)
+
+        rule_block = selector_match.group("body")
+        self.assertRegex(rule_block, r"top:\s*calc\(var\(--bs-navbar-padding-y\)\s*\+\s*20px\);")
+        self.assertRegex(rule_block, r"transform:\s*translate\(-50%,\s*-50%\);")
     def test_home_mobile_welcome_title_centered(self):
         response = self.client.get(reverse("home"))
         html = response.content.decode()

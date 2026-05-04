@@ -53,6 +53,21 @@ def env_int(name: str, default: int) -> int:
         return default
     return int(value)
 
+
+def env_str(name: str, default: str = '') -> str:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip()
+
+
+def env_optional_str(name: str) -> str | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -66,6 +81,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-#g((q@lvnkt(j6)2(gvtn0px)r
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool('DEBUG', True)
+S3_ENABLE = env_bool('S3_ENABLE', False)
+S3_USE_LOCAL_URLS = env_bool('S3_USE_LOCAL_URLS', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', [
     '192.168.1.142',
@@ -87,9 +104,11 @@ INSTALLED_APPS = [
     'compressor',
 ]
 
+if S3_ENABLE:
+    INSTALLED_APPS.append('storages')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -97,6 +116,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if not S3_ENABLE:
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'proyecto.urls'
 
@@ -210,6 +232,27 @@ STORAGES = {
         ),
     },
 }
+
+if S3_ENABLE:
+    AWS_STORAGE_BUCKET_NAME = env_str('AWS_STORAGE_BUCKET_NAME') or None
+    AWS_ACCESS_KEY_ID = env_optional_str('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = env_optional_str('AWS_SECRET_ACCESS_KEY')
+    AWS_S3_REGION_NAME = env_optional_str('AWS_S3_REGION_NAME')
+    AWS_S3_ENDPOINT_URL = env_optional_str('AWS_S3_ENDPOINT_URL')
+    AWS_S3_CUSTOM_DOMAIN = env_optional_str('AWS_S3_CUSTOM_DOMAIN')
+    AWS_S3_USE_SSL = env_bool('AWS_S3_USE_SSL', True)
+    AWS_QUERYSTRING_AUTH = env_bool('AWS_QUERYSTRING_AUTH', False)
+    AWS_DEFAULT_ACL = env_str('AWS_DEFAULT_ACL', 'public-read') or None
+    AWS_S3_OBJECT_PARAMETERS = {}
+
+    STORAGES = {
+        'default': {
+            'BACKEND': 'tienda.storage_backends.MediaStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'tienda.storage_backends.StaticStorage',
+        },
+    }
 
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
@@ -385,5 +428,3 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 USE_X_FORWARDED_HOST = True
 SECURE_REFERER_POLICY = "strict-origin-when-cross-origin"
-
-print(f"DEBUG: ALLOWED_HOSTS is {ALLOWED_HOSTS}")
