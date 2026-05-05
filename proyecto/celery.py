@@ -8,6 +8,6 @@ django.setup()
 app = Celery('proyecto')
 app.config_from_object('django.conf:settings', namespace="CELERY")
 
-app.user_options = {}
+user_options = {}
 
 app.autodiscover_tasks()
