@@ -23,6 +23,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
 import stripe
 from django.db import models, transaction
+from django.db.models import F
 from django.core.cache import cache
 import re
 import unicodedata
@@ -474,14 +475,28 @@ def _get_active_reservation_ids_for_request(request: HttpRequest):
 
 
 def _get_available_stock_by_product(product_ids, exclude_reservation_ids=None):
+    """Calcula stock disponible con bloqueo atómico para evitar race conditions."""
     _release_expired_stock_reservations()
-    products = Product.objects.filter(id__in=product_ids)
-    stocks = {product.id: product.stock for product in products}
-    reserved = _get_reserved_quantities_by_product(product_ids, exclude_reservation_ids=exclude_reservation_ids)
-    return {
-        product_id: max(stocks.get(product_id, 0) - reserved.get(product_id, 0), 0)
-        for product_id in product_ids
-    }
+    
+    if not product_ids:
+        return {}
+    
+    with transaction.atomic():
+        # Bloquear productos a nivel de fila para evitar race conditions
+        products = Product.objects.select_for_update().filter(id__in=product_ids)
+        stocks = {product.id: product.stock for product in products}
+        
+        # Las reservas se consultan dentro de la transacción atómica
+        # _get_reserved_quantities_by_product hace una lectura consistente
+        reserved = _get_reserved_quantities_by_product(
+            product_ids, 
+            exclude_reservation_ids=exclude_reservation_ids
+        )
+        
+        return {
+            product_id: max(stocks.get(product_id, 0) - reserved.get(product_id, 0), 0)
+            for product_id in product_ids
+        }
 
 
 def _get_cart_stock_issues(cart_items, exclude_reservation_ids=None):
@@ -703,7 +718,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             )
 
             product_row = product_map.get(item.product_id)
-            product_row.stock -= item.quantity
+            product_row.stock = F('stock') - item.quantity
             product_row.save(update_fields=["stock"])
 
         _invalidate_product_cache(product_ids)
