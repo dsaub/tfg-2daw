@@ -216,6 +216,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+COMPRESS_ROOT = STATIC_ROOT
 STATICFILES_DIRS = [
     BASE_DIR / 'tienda' / 'static',
 ]
