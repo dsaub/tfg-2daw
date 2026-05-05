@@ -72,3 +72,11 @@ Only sells to Almería province, Spain (postal codes 04xxx). All addresses saved
 - github Defaults to the GITHUB repo
 - gitlab Defaults to a Gitlab mirror (doesn't work by now)
 
+# Deploy machine info.
+- Every time you make a change, please commit it and push it to "origin and github", and verify github actions succeeded.
+- When Github Actions succeed, it will update the docker image "ghcr.io/dsaub/proyecto-mvc:development".
+- When "ghcr.io/dsaub/proyecto-mvc:development" updates, that affects swarm mvc_web and mvc_worker services, so update them
+- You can SSH docker swarm "Docker 1" instance at debian@172.16.14.221
+- Docker SWARM is in my school's OpenStack, needing the VPN, if you can't connect, OMIT the deploy, if you can, then do.
+- Docker Swarm Stack is at /home/debian/composes/mvc/mvc.yml. That file is on "debian@172.16.14.221" server.
+- WARNING: Updating the Docker SWARM SERVICE can HANG UP indefinitely, apply a 1-minute time out so if it's still executing it stops it by force
