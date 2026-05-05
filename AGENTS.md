@@ -59,3 +59,16 @@ Only sells to Almería province, Spain (postal codes 04xxx). All addresses saved
 - Redis setup: `docs/REDIS_SETUP.md`
 - PayPal: `docs/PAYPAL_SETUP.md`, `docs/PAYPAL_TROUBLESHOOTING.md`
 - View documentation: `docs/views/`
+
+# Adittional Information
+
+- Use Github CLI to manage GitHUB Issues and Pull Requests
+- Repo is https://github.com/dsaub/proyecto-final
+- Strictly use virtualenvs on .venv folder, if not exists, create it, make sure to use Python 3.14
+
+
+# GIT Remotes
+- origin (main) Defaults to https://git.elordenador.org/elordenador/proyecto-final (via SSH)
+- github Defaults to the GITHUB repo
+- gitlab Defaults to a Gitlab mirror (doesn't work by now)
+
