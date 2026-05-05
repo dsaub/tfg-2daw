@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from django.db import models
 from django.contrib.auth.models import User, AbstractUser
 from django.utils.crypto import get_random_string
@@ -342,8 +343,46 @@ class ShippingAddress(models.Model):
     def __str__(self):
         return f"{self.full_name} - {self.city}"
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from django.conf import settings
+
+        postal_code = (self.postal_code or "").strip()
+        city = (self.city or "").strip()
+
+        if settings.POSTGRES_ENABLED:
+            almeria_prefix = "04"
+        else:
+            from .vars import ALMERIA_POSTAL_CODE_PREFIX
+            almeria_prefix = ALMERIA_POSTAL_CODE_PREFIX
+
+        if len(postal_code) != 5 or not postal_code.isdigit() or not postal_code.startswith(almeria_prefix):
+            raise ValidationError({
+                'postal_code': 'Solo realizamos envíos en la provincia de Almería (código postal 04xxx).'
+            })
+
+        if settings.POSTGRES_ENABLED:
+            from .vars import ALMERIA_MUNICIPALITIES_DISPLAY
+            normalized_municipalities = {
+                unicodedata.normalize("NFD", m).encode('ASCII', 'ignore').decode('ASCII')
+                .lower().replace("-", " ").replace("  ", " ").strip()
+                for m in ALMERIA_MUNICIPALITIES_DISPLAY
+            }
+            normalized_city = unicodedata.normalize("NFD", city).encode('ASCII', 'ignore').decode('ASCII').lower()
+        else:
+            from .views import _normalize_location_text
+            normalized_city = _normalize_location_text(city)
+
+            from .vars import ALMERIA_MUNICIPALITIES_DISPLAY
+            normalized_municipalities = {_normalize_location_text(m) for m in ALMERIA_MUNICIPALITIES_DISPLAY}
+
+        if normalized_city not in normalized_municipalities:
+            raise ValidationError({
+                'city': 'El pueblo/ciudad debe pertenecer a la provincia de Almería.'
+            })
+
     def save(self, *args, **kwargs):
-        # Si se marca como predeterminada, desmarcar las demás del usuario
+        self.full_clean()
         if self.is_default:
             ShippingAddress.objects.filter(user=self.user, is_default=True).update(is_default=False)
         super().save(*args, **kwargs)
