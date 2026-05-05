@@ -84,6 +84,7 @@ class Image(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=200, default="")
+    sku = models.CharField(max_length=50, unique=True, blank=True, null=True)
     description = models.TextField(default = "")
     briefdesc = models.TextField(default = "")
     price = models.FloatField(default = 0)
@@ -107,6 +108,7 @@ class Product(models.Model):
     def to_dict(self):
         return {
             "name": self.name,
+            "sku": self.sku,
             "description": self.description,
             "briefdesc": self.briefdesc,
             "price": self.price,

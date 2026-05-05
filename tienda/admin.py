@@ -10,8 +10,8 @@ admin.site.register(VerificationCode)
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'price', 'stock', 'category', 'creator')
-    search_fields = ('name', 'creator__username', 'creator__email')
+    list_display = ('id', 'sku', 'name', 'price', 'stock', 'category', 'creator')
+    search_fields = ('name', 'sku', 'creator__username', 'creator__email')
     list_filter = ('category',)
 class CartItemInline(admin.TabularInline):
     model = CartItem
