@@ -346,35 +346,21 @@ class ShippingAddress(models.Model):
     def clean(self):
         from django.core.exceptions import ValidationError
         from django.conf import settings
+        from .vars import ALMERIA_POSTAL_CODE_PREFIX, ALMERIA_MUNICIPALITIES_DISPLAY
+        from .views import _normalize_location_text
 
         postal_code = (self.postal_code or "").strip()
         city = (self.city or "").strip()
 
-        if settings.POSTGRES_ENABLED:
-            almeria_prefix = "04"
-        else:
-            from .vars import ALMERIA_POSTAL_CODE_PREFIX
-            almeria_prefix = ALMERIA_POSTAL_CODE_PREFIX
+        almeria_prefix = getattr(settings, 'POSTGRES_ENABLED', False) and "04" or ALMERIA_POSTAL_CODE_PREFIX
 
         if len(postal_code) != 5 or not postal_code.isdigit() or not postal_code.startswith(almeria_prefix):
             raise ValidationError({
                 'postal_code': 'Solo realizamos envíos en la provincia de Almería (código postal 04xxx).'
             })
 
-        if settings.POSTGRES_ENABLED:
-            from .vars import ALMERIA_MUNICIPALITIES_DISPLAY
-            normalized_municipalities = {
-                unicodedata.normalize("NFD", m).encode('ASCII', 'ignore').decode('ASCII')
-                .lower().replace("-", " ").replace("  ", " ").strip()
-                for m in ALMERIA_MUNICIPALITIES_DISPLAY
-            }
-            normalized_city = unicodedata.normalize("NFD", city).encode('ASCII', 'ignore').decode('ASCII').lower()
-        else:
-            from .views import _normalize_location_text
-            normalized_city = _normalize_location_text(city)
-
-            from .vars import ALMERIA_MUNICIPALITIES_DISPLAY
-            normalized_municipalities = {_normalize_location_text(m) for m in ALMERIA_MUNICIPALITIES_DISPLAY}
+        normalized_city = _normalize_location_text(city)
+        normalized_municipalities = {_normalize_location_text(m) for m in ALMERIA_MUNICIPALITIES_DISPLAY}
 
         if normalized_city not in normalized_municipalities:
             raise ValidationError({
