@@ -3,6 +3,7 @@ from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, 
 # Register your models here.
 from django.shortcuts import redirect
 from django.urls import path
+from django.contrib import messages
 from . import tasks
 
 admin.site.register(Category)
@@ -24,9 +25,14 @@ class UserAdmin(admin.ModelAdmin):
 
             tasks.banear_usuario.delay(user.email)
 
-            Product.objects.filter(user=user).delete()
+            Product.objects.filter(creator=user).delete()
+        self.message_user(
+            request,
+            f"Se ha(n) baneado {usuarios_baneados} usuario(s) correctamente.",
+            level=messages.SUCCESS
+        )
     
-        
+    banear_usuario_action.short_description = "Banear usuarios seleccionados"
 
 
 @admin.register(Product)
