@@ -13,7 +13,7 @@ admin.site.register(VerificationCode)
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     search_fields = ('username',)
-    actions = ['banear_usuario_action']
+    actions = ['banear_usuario_action', 'desbanear_usuario_action']
     def has_change_permission(self, request, obj = ...):
         return super().has_change_permission(request, obj)
     
