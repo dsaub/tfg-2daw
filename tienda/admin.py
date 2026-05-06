@@ -12,30 +12,21 @@ admin.site.register(VerificationCode)
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     search_fields = ('username',)
-
+    actions = ['banear_usuario_action']
     def has_change_permission(self, request, obj = ...):
         return super().has_change_permission(request, obj)
     
-    def get_urls(self):
-        urls = super().get_urls()
-        my_urls = [
-            path("<int:pk>/ban/", self.admin_site.admin_view(self.ban_view)),
-        ]
-        return my_urls + urls
+    def banear_usuario_action(self, request, queryset):
+        usuarios_baneados = 0
+        for user in queryset:
+            user.is_active = False
+            user.save()
+
+            tasks.banear_usuario.delay(user.email)
+
+            Product.objects.filter(user=user).delete()
     
-    def ban_view(self, request, pk):
-        user = User.objects.get(pk=pk)
-
-        user.is_active = False # Desactivar cuenta de usuario
-        user.save() # Guardar datos
-
-        tasks.banear_usuario.delay(user.email)
-
-        # Borrar productos
-        productos = Product.objects.filter(user=user).all()
-        for producto in productos:
-            producto.delete()
-        return redirect("admin")
+        
 
 
 @admin.register(Product)
