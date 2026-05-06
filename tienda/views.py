@@ -245,9 +245,9 @@ def login(request: HttpRequest):
             data: str = cache.get(f"tries_login_{username}")
             logins: int
             if data is None:
-                logins = int(data)
-            else:
                 logins = 0
+            else:
+                logins = int(data)
             
             if logins >= 5:
                 # Si ha fallado 5 intentos de login...
