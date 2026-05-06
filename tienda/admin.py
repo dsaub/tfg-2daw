@@ -59,11 +59,11 @@ class UserAdmin(admin.ModelAdmin):
             f"Se ha(n) desbaneado {user_desbaneados} usuario(s)",
             level=messages.SUCCESS
         )
-        
+
 
     
     banear_usuario_action.short_description = "Banear usuarios seleccionados"
-
+    desbanear_usuario_action.short_description = "Desbanear usuarios seleccionados"
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
