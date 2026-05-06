@@ -29,6 +29,17 @@ def banear_usuario(email_usuario: str):
     )
 
     send_hemail(email_usuario, "Cuenta Bloqueada", html_content, "Tu cuenta ha sido bloqueada...")
+
+@shared_task
+def desbanear_usuario(email_usuario: str):
+    html_content = render_to_string(
+        'emails/unban.html',
+        {},
+        using='jinja2'
+    )
+
+    send_hemail(email_usuario, "Cuenta Desbloqueada", html_content, "Tu cuenta ha sido desbloqueada...")
+
 @shared_task
 def enviar_correo_confirmacion(id: int):
     usuario = User.objects.get(id=id)
