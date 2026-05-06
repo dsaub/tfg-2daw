@@ -30,6 +30,11 @@ class UserAdmin(admin.ModelAdmin):
         user.save() # Guardar datos
 
         tasks.banear_usuario.delay(user.email)
+
+        # Borrar productos
+        productos = Product.objects.filter(user=user).all()
+        for producto in productos:
+            producto.delete()
         return redirect("admin")
 
 
