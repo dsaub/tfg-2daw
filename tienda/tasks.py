@@ -20,6 +20,16 @@ def enviar_correo_bienvenida(email_usuario: str, nombre_usuario: str):
     send_hemail(email_usuario, "Inicio de Sesión correcto", html_content, "Has iniciado sesión...")
 
 @shared_task
+def banear_usuario(email_usuario: str):
+    html_content = render_to_string(
+        'emails/ban.html',
+        {
+        },
+        using='jinja2'
+    )
+
+    send_hemail(email_usuario, "Cuenta Bloqueada", html_content, "Tu cuenta ha sido bloqueada...")
+@shared_task
 def enviar_correo_confirmacion(id: int):
     usuario = User.objects.get(id=id)
     code = VerificationCode.objects.create(

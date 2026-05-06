@@ -1,11 +1,36 @@
 from django.contrib import admin
 from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode, SavedPaymentMethod
 # Register your models here.
+from django.shortcuts import redirect
+from django.urls import path
+from . import tasks
 
 admin.site.register(Category)
 admin.site.register(Image)
-admin.site.register(User)
 admin.site.register(VerificationCode)
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    search_fields = ('username',)
+
+    def has_change_permission(self, request, obj = ...):
+        return super().has_change_permission(request, obj)
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [
+            path("<int:pk>/ban/", self.admin_site.admin_view(self.ban_view)),
+        ]
+        return my_urls + urls
+    
+    def ban_view(self, request, pk):
+        user = User.objects.get(pk=pk)
+
+        user.is_active = False # Desactivar cuenta de usuario
+        user.save() # Guardar datos
+
+        tasks.banear_usuario.delay(user.email)
+        return redirect("admin")
 
 
 @admin.register(Product)
