@@ -290,6 +290,15 @@ def login(request: HttpRequest):
             messages.success(request, f"¡Bienvenido {user.first_name or user.username}!")
             return redirect("index")
         else:
+            user1: User = User.objects.get(username=username)
+            if user1.registration_status == User.RegisterStatus.BANNED:
+                    audit_logger.warning(
+                        "LOGIN FAILED email=%s reason=user_banned ip=%s",
+                        email,
+                        client_ip,
+                    )
+                    messages.error(request, "Error, La cuenta esta bloqueada")
+                    return render(request, "tienda/login.html")
             audit_logger.warning(
                 "LOGIN_FAILED email=%s reason=invalid_credentials ip=%s",
                 email,
