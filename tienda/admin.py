@@ -20,17 +20,47 @@ class UserAdmin(admin.ModelAdmin):
     def banear_usuario_action(self, request, queryset):
         usuarios_baneados = 0
         for user in queryset:
+            user: User = user
+            # Desactiva usuario
+            if user.registration_status == User.RegisterStatus.BANNED:
+                continue
+            
             user.is_active = False
+            user.registration_status = User.RegisterStatus.BANNED
             user.save()
 
+            # Enviar task a Worker
             tasks.banear_usuario.delay(user.email)
 
+            # Borrar productos
             Product.objects.filter(creator=user).delete()
+            usuarios_baneados+=1
         self.message_user(
             request,
             f"Se ha(n) baneado {usuarios_baneados} usuario(s) correctamente.",
             level=messages.SUCCESS
         )
+    def desbanear_usuario_action(self, request, queryset):
+        user_desbaneados = 0
+        for user in queryset:
+            user: User = user
+            if user.registration_status != User.RegisterStatus.BANNED:
+                continue
+            
+            user.is_active = True
+            user.registration_status = User.RegisterStatus.ACTIVE
+            user.save()
+
+            tasks.desbanear_usuario.delay(user.email)
+
+            user_desbaneados -= 1
+        self.message_user(
+            request,
+            f"Se ha(n) desbaneado {user_desbaneados} usuario(s)",
+            level=messages.SUCCESS
+        )
+        
+
     
     banear_usuario_action.short_description = "Banear usuarios seleccionados"
 
