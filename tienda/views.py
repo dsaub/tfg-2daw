@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
-
+from django.db.utils import DataError
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode, SavedPaymentMethod
@@ -1011,16 +1011,22 @@ def crear_producto(request: HttpRequest):
             categories = Category.objects.all()
             return render(request, "tienda/crear_producto.html", {"categories": categories})
         # Crear producto
-        producto = Product.objects.create(
-            name=name,
-            briefdesc=briefdesc or "",
-            description=description,
-            price=price,
-            stock=stock,
-            category=category,
-            primary_image=primary_image,
-            creator=request.user
-        )
+        try:
+            producto = Product.objects.create(
+                name=name,
+                briefdesc=briefdesc or "",
+                description=description,
+                price=price,
+                stock=stock,
+                category=category,
+                primary_image=primary_image,
+                creator=request.user
+            )
+        except DataError as e:
+            logger.exception("ERROR Creating product: " + str(e))
+            messages.error(request, "Se ha excedido el limite de 1000 caracteres en Descripción corta o el limite de 5000 caracteres en Descripción.")
+            categories = Category.objects.all()
+            return render(request, "tienda/crear_producto.html", {"categories": categories})
         _invalidate_product_cache([producto.id])
         
         # Agregar imágenes secundarias si se proporcionan
