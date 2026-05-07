@@ -15,7 +15,7 @@ from .vars import (
     STOCK_RESERVATION_MINUTES,
 )
 from django.conf import settings
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils import timezone
@@ -1185,7 +1185,7 @@ def stripe_config(request):
 
 
 @login_required
-@csrf_exempt
+@csrf_protect
 def create_checkout_session(request: HttpRequest):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -1524,6 +1524,7 @@ def paypal_execute(request: HttpRequest):
 # ==================== STRIPE PAYMENT INTENTS ====================
 
 @login_required
+@csrf_protect
 def crear_payment_intent(request: HttpRequest):
     """
     Crea un Stripe PaymentIntent para el carrito actual.
@@ -1607,6 +1608,7 @@ def crear_payment_intent(request: HttpRequest):
 
 
 @login_required
+@csrf_protect
 def confirmar_pago_tarjeta(request: HttpRequest):
     """
     Verificar que el PaymentIntent fue exitoso y crear el pedido.
@@ -1680,6 +1682,7 @@ def confirmar_pago_tarjeta(request: HttpRequest):
 # ==================== PAYPAL ORDERS API ====================
 
 @login_required
+@csrf_protect
 def crear_orden_paypal(request: HttpRequest):
     """
     Crea una orden de PayPal con el total del carrito actual (Orders API v2).
@@ -1733,6 +1736,7 @@ def crear_orden_paypal(request: HttpRequest):
 
 
 @login_required
+@csrf_protect
 def capturar_orden_paypal(request: HttpRequest):
     """
     Captura una orden de PayPal aprobada y crea el pedido en nuestra BD.
@@ -1843,6 +1847,7 @@ def agregar_tarjeta(request: HttpRequest):
 
 
 @login_required
+@csrf_protect
 def crear_setup_intent(request: HttpRequest):
     """
     Crea un Stripe SetupIntent y retorna el client_secret para que el frontend
@@ -1867,6 +1872,7 @@ def crear_setup_intent(request: HttpRequest):
 
 
 @login_required
+@csrf_protect
 def confirmar_setup_intent(request: HttpRequest):
     """
     Tras la confirmación del SetupIntent en el frontend, guarda la tarjeta.
@@ -1968,6 +1974,7 @@ def agregar_paypal(request: HttpRequest):
 
 
 @login_required
+@csrf_protect
 def crear_orden_paypal_setup(request: HttpRequest):
     """
     Crea una orden PayPal de 0.01 € para verificar/guardar la cuenta.
@@ -1984,6 +1991,7 @@ def crear_orden_paypal_setup(request: HttpRequest):
 
 
 @login_required
+@csrf_protect
 def capturar_orden_paypal_setup(request: HttpRequest):
     """
     Captura la orden de verificación de PayPal y guarda la cuenta del usuario.
