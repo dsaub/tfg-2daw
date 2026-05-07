@@ -85,8 +85,8 @@ class Image(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=200, default="")
     sku = models.CharField(max_length=50, unique=True, blank=True, null=True)
-    description = models.TextField(default = "")
-    briefdesc = models.TextField(default = "")
+    description = models.TextField(default = "", max_length=5000)
+    briefdesc = models.TextField(default = "", max_length=1000)
     price = models.FloatField(default = 0)
     stock = models.PositiveIntegerField(default=0)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
