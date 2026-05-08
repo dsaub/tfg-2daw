@@ -43,6 +43,17 @@ STOCK_RESERVATION_SESSION_KEY = "stock_reservation_id"
 STOCK_RESERVATION_PAYMENT_SESSION_KEY = "stock_reservation_payment_method"
 
 
+def _mask_email(email: str) -> str:
+    if not email or '@' not in email:
+        return "***"
+    local, domain = email.rsplit('@', 1)
+    if len(local) <= 2:
+        masked_local = local[0] + '*'
+    else:
+        masked_local = local[0] + '*' * (len(local) - 2) + local[-1]
+    return f"{masked_local}@{domain}"
+
+
 def _invalidate_product_cache(product_ids):
     unique_product_ids = {product_id for product_id in product_ids if product_id is not None}
     if not unique_product_ids:
@@ -235,7 +246,7 @@ def login(request: HttpRequest):
                 user: User = User.objects.get(email=email)
                 username = user.username
             except User.DoesNotExist:
-                audit_logger.warning("LOGIN FAILED email=%s reason=user_not_found ip=%s", email, client_ip)
+                audit_logger.warning("LOGIN FAILED email=%s reason=user_not_found ip=%s", _mask_email(email), client_ip)
                 messages.error(request, "El email o la contraseña es incorrecta")
                 return render(request, "tienda/login.html", {"form": form})
             if user.registration_status == User.RegisterStatus.BANNED:
@@ -254,7 +265,7 @@ def login(request: HttpRequest):
                     logins = int(data)
                 
                 if logins >= 5:
-                    audit_logger.info("LOGIN FAILED email=%s reason=rate_limited", email)
+                    audit_logger.info("LOGIN FAILED email=%s reason=rate_limited", _mask_email(email))
                     messages.error(request, "Has sufrido de Rate Limit por fallar 5 veces la contraseña")
                     return render(request, "tienda/login.html", {"form": form})
                 logins+=1
@@ -262,7 +273,7 @@ def login(request: HttpRequest):
                 messages.error(request, "El email o la contraseña es incorrecta")
                 return render(request, "tienda/login.html", {"form": form})
             if user.registration_status == User.RegisterStatus.CONFIRMATION_REQUIRED:
-                audit_logger.info("LOGIN_FAILED email=%s reason=not_verified", email)
+                audit_logger.info("LOGIN_FAILED email=%s reason=not_verified", _mask_email(email))
                 messages.error(request, "No se puede iniciar sesión porque no has verificado tu cuenta, comprueba tu email. Si eliminaste el email pero querias verificarte, contacta con el soporte tecnico")
                 return render(request, "tienda/login.html", {"form": form})
             auth_login(request, user)
@@ -272,7 +283,7 @@ def login(request: HttpRequest):
             else:
                 request.session.set_expiry(1209600)
             
-            audit_logger.info("LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s", user.id, user.email, client_ip, bool(remember))
+            audit_logger.info("LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s", user.id, _mask_email(user.email), client_ip, bool(remember))
             tasks.enviar_correo_bienvenida.delay(user.email, f"{user.first_name} {user.last_name}")
             messages.success(request, f"¡Bienvenido {user.first_name or user.username}!")
             return redirect("index")
@@ -332,7 +343,7 @@ def register(request: HttpRequest):
 
             # Validación email
             if User.objects.filter(email=email).exists():
-                audit_logger.warning("REGISTER_FAILED email=%s reason=email_exists ip=%s", email, client_ip)
+                audit_logger.warning("REGISTER_FAILED email=%s reason=email_exists ip=%s", _mask_email(email), client_ip)
                 messages.error(request, "Ya existe un usuario con este correo electrónico")
                 return render(request, "tienda/register.html", {"form":form})
             
@@ -352,7 +363,7 @@ def register(request: HttpRequest):
                 "REGISTER_SUCCESS user_id=%s username=%s email=%s ip=%s",
                 user.id,
                 user.username,
-                user.email,
+                _mask_email(user.email),
                 client_ip,
             )
         
@@ -370,7 +381,7 @@ def logout(request: HttpRequest):
     email = request.user.email if request.user.is_authenticated else None
     client_ip = _get_client_ip(request)
     auth_logout(request)
-    audit_logger.info("LOGOUT user_id=%s email=%s ip=%s", user_id, email, client_ip)
+    audit_logger.info("LOGOUT user_id=%s email=%s ip=%s", user_id, _mask_email(email) if email else "***", client_ip)
     messages.success(request, "Has cerrado sesión exitosamente.")
     return redirect("index")
 

@@ -1,6 +1,17 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator, MinLengthValidator, MaxLengthValidator
 from .models import Category
+
+ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+def validate_image_file(value):
+    ext = value.name.split('.')[-1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise ValidationError(f'Tipo de archivo no permitido. Allowed: {", ".join(ALLOWED_IMAGE_EXTENSIONS)}')
+    if hasattr(value, 'content_type') and value.content_type not in ALLOWED_MIME_TYPES:
+        raise ValidationError(f'Tipo MIME no permitido. Allowed: {", ".join(ALLOWED_MIME_TYPES)}')
 
 
 class ProductForm(forms.Form): 
@@ -61,6 +72,7 @@ class ProductForm(forms.Form):
     primary_image = forms.ImageField(
         label="Imagen Principal",
         required = False,
+        validators=[validate_image_file],
         widget = forms.ClearableFileInput(
             attrs = {
                 'class': 'form-control',
@@ -108,6 +120,7 @@ class ProductEditForm(forms.Form):
     primary_image = forms.ImageField(
         label="Imagen Principal (opcional)",
         required=False,
+        validators=[validate_image_file],
         widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'})
     )
 
@@ -116,6 +129,7 @@ class SecondaryImageForm(forms.Form):
     image = forms.ImageField(
         label="Seleccionar Imagen",
         required = True,
+        validators=[validate_image_file],
         widget = forms.ClearableFileInput(
             attrs = {
                 'class': 'form-control',
@@ -190,7 +204,9 @@ class UserRegisterForm(forms.Form):
     password = forms.CharField(
         label = "Contraseña",
         max_length = 255,
+        min_length = 8,
         required = True,
+        validators=[MinLengthValidator(8)],
         widget = forms.PasswordInput(
             attrs = {
                 'class': 'form-control'
@@ -200,7 +216,9 @@ class UserRegisterForm(forms.Form):
     password_confirm = forms.CharField(
         label = "Verificar Contraseña",
         max_length = 255,
+        min_length = 8,
         required = True,
+        validators=[MinLengthValidator(8)],
         widget = forms.PasswordInput(
             attrs = {
                 'class': 'form-control'
