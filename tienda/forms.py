@@ -399,13 +399,3 @@ class ReviewForm(forms.Form):
             'placeholder': 'Comparte tu experiencia con este producto...'
         })
     )
-    images = forms.ImageField(
-        label="Imágenes (opcional)",
-        required=False,
-        validators=[validate_image_file],
-        widget=forms.ClearableFileInput(attrs={
-            'class': 'form-control',
-            'accept': 'image/*',
-            'multiple': True
-        })
-    )
