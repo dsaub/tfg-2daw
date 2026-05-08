@@ -4,6 +4,8 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.db.utils import DataError
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+
+from tienda.utilities import send_email
 from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode, SavedPaymentMethod
 from .forms import ProductForm, SecondaryImageForm, UserLoginForm, UserRegisterForm, ProductEditForm, EditProfileForm, ChangePasswordForm, ShippingAddressForm, ResetPasswordForm, ResetPasswordPhase2Form
 from . import tasks
