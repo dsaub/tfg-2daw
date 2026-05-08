@@ -122,6 +122,27 @@ class Product(models.Model):
             "creator": self.creator.to_dict() if self.creator else None
         }
 
+    def has_user_purchased(self, user):
+        """Verifica si el usuario ha comprado este producto al menos una vez"""
+        if not user or not user.is_authenticated:
+            return False
+        return OrderItem.objects.filter(
+            order__buyer=user,
+            order__status=Order.STATUS_PAID,
+            product=self
+        ).exists()
+
+    def get_average_rating(self):
+        """Retorna la nota media de las valoraciones"""
+        reviews = self.reviews.all()
+        if not reviews.exists():
+            return 0
+        return round(reviews.aggregate(models.Avg('rating'))['rating__avg'], 1)
+
+    def get_reviews_count(self):
+        """Retorna el número total de valoraciones"""
+        return self.reviews.count()
+
 
 class StockReservation(models.Model):
     STATUS_ACTIVE = "active"
@@ -329,6 +350,25 @@ class SavedPaymentMethod(models.Model):
         if self.is_default:
             SavedPaymentMethod.objects.filter(user=self.user, is_default=True).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class Review(models.Model):
+    """Valoraciones de productos por usuarios que han realizado una compra"""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_reviews')
+    rating = models.PositiveIntegerField(validators=[MaxValueValidator(5)])
+    title = models.CharField(max_length=200, default="")
+    content = models.TextField(max_length=2000, default="")
+    images = models.ManyToManyField(Image, related_name='product_reviews', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('product', 'user')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Valoración de {self.user.username} en {self.product.name} ({self.rating}★)"
 
 
 class ShippingAddress(models.Model):
