@@ -66,9 +66,6 @@
 <div class="row mt-4">
     <div class="col-md-12">
         <h4 class="mb-3">Valoraciones</h4>
-        <div class="alert alert-info">
-            DEBUG: can_review={{can_review}}, user.is_authenticated={{user.is_authenticated}}, user={{user}}
-        </div>
         <div id="reviews-summary" class="mb-4">
             <div class="d-flex align-items-center gap-3">
                 <div class="fs-4" id="average-rating">0.0</div>
@@ -79,7 +76,7 @@
                 {% if can_review %}
                 <a href="{% url 'add_review' product.id %}" class="btn btn-sm btn-outline-primary ms-auto">Valorar este producto</a>
                 {% elif user.is_authenticated %}
-                <span class="text-muted ms-auto">Ya has valorado este producto</span>
+                <span class="text-muted ms-auto">Solo puedes valorar productos que hayas comprado</span>
                 {% else %}
                 <a href="{% url 'login' %}?next={% url 'producto' product.id %}" class="btn btn-sm btn-outline-primary ms-auto">Inicia sesión para valorar</a>
                 {% endif %}
