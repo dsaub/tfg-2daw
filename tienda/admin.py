@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode, SavedPaymentMethod
+from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode, SavedPaymentMethod, Review
 # Register your models here.
 from django.shortcuts import redirect
 from django.urls import path
@@ -151,3 +151,10 @@ class SavedPaymentMethodAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'method_type', 'label', 'is_default', 'created_at')
     list_filter = ('method_type', 'is_default', 'created_at')
     search_fields = ('user__username', 'user__email', 'label', 'paypal_email')
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ('id', 'product', 'user', 'rating', 'title', 'created_at')
+    list_filter = ('rating', 'created_at')
+    search_fields = ('user__username', 'product__name', 'title', 'content')
