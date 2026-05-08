@@ -67,7 +67,7 @@ Si todo está bien, deberías ver:
 
 ## Checklist de Configuración
 
-- [ ] `pip install paypalrestsdk` (verificar con: `.venv/bin/pip list | grep paypal`)
+- [ ] `uv add paypalrestsdk` (verificar con: `uv pip list | grep paypal`)
 - [ ] `PAYPAL_CLIENT_ID` en settings.py (no vacío)
 - [ ] `PAYPAL_CLIENT_SECRET` en settings.py (no vacío)
 - [ ] `PAYPAL_MODE = 'sandbox'` en settings.py
