@@ -16,15 +16,16 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
+      - name: Configurar uv
+        uses: astral-sh/setup-uv@v6
       - name: Instalar dependencias
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          uv sync --no-dev --no-install-project
       - name: Ejecutar tests
         env:
           DJANGO_SETTINGS_MODULE: proyecto.settings
         run: |
-          python manage.py test
+          uv run python manage.py test
   docker:
     runs-on: ubuntu-latest
     needs: test

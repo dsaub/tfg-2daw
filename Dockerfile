@@ -4,9 +4,10 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
-COPY requirements.txt /app/
+COPY pyproject.toml /app/
 RUN apk --no-cache update && apk --no-cache upgrade
-RUN pip install --no-cache-dir -r requirements.txt 
+RUN pip install --no-cache-dir uv
+RUN uv sync --no-dev --no-install-project
 
 COPY . /app/
 RUN chmod +x /app/entrypoint.sh
