@@ -1,0 +1,81 @@
+{% extends "tienda/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row mt-4 mb-5">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>Gestionar Imágenes</h2>
+                <p class="text-muted mb-0">Producto: <strong>{{ producto.name }}</strong></p>
+            </div>
+            <a href="{% url 'mis_productos' %}" class="btn btn-outline-secondary">← Volver a Mis Productos</a>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Imagen Principal</h5>
+            </div>
+            <div class="card-body">
+                {% if producto.primary_image %}
+                <img src="{{ producto.primary_image.image.url }}" alt="{{ producto.primary_image.alt|default:producto.name }}" class="rounded" style="width: 200px; height: 200px; object-fit: cover;">
+                <p class="mt-2 text-muted mb-0">Esta imagen no se puede cambiar desde aquí.</p>
+                {% else %}
+                <p class="text-muted">No hay imagen principal asignada.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Imágenes Secundarias</h5>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarImagenModal">
+                    ➕ Agregar Imagen
+                </button>
+            </div>
+            <div class="card-body">
+                {% if secondary_images %}
+                <div class="row">
+                    {% for img in secondary_images %}
+                    <div class="col-md-3 col-sm-4 col-6 mb-3">
+                        <div class="card">
+                            <img src="{{ img.image.url }}" alt="{{ img.alt|default:producto.name }}" class="card-img-top" style="height: 180px; object-fit: cover;">
+                            <div class="card-body p-2">
+                                <form method="POST" action="{% url 'eliminar_imagen_secundaria' producto.id img.id %}" onsubmit="return confirm('¿Seguro que quieres eliminar esta imagen?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">🗑 Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No hay imágenes secundarias. ¡Agrega una!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="agregarImagenModal" tabindex="-1" aria-labelledby="agregarImagenModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="agregarImagenModalLabel">Agregar Imagen Secundaria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    {{ form }}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Subir Imagen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -14,6 +14,7 @@ from .models import (
     StockReservation, StockReservationItem, Cart, CartItem, 
     Order, OrderItem, OrderMessage, SavedPaymentMethod, ShippingAddress
 )
+from .forms import UserRegisterForm, UserLoginForm, EditProfileForm, ChangePasswordForm, ShippingAddressForm, ResetPasswordForm, ResetPasswordPhase2Form
 from .vars import VAT_RATE, TRANSACTION_CODE_PREFIX
 import string
 import random
@@ -22,6 +23,185 @@ import random
 # ==================== USER MODEL TESTS ====================
 class UserModelTests(TestCase):
     """Tests exhaustivos para el modelo User."""
+
+
+class FormTests(TestCase):
+    """Tests para formularios Django."""
+
+    def test_user_register_form_terms_required(self):
+        """El campo terms debe ser obligatorio."""
+        form = UserRegisterForm(data={
+            "name": "Test User",
+            "email": "test@example.com",
+            "password": "password123",
+            "password_confirm": "password123",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("terms", form.errors)
+
+    def test_user_register_form_terms_off_not_checked(self):
+        """Si terms está en off (None/false), debe fallar."""
+        form = UserRegisterForm(data={
+            "name": "Test User",
+            "email": "test@example.com",
+            "password": "password123",
+            "password_confirm": "password123",
+            "terms": False,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("terms", form.errors)
+
+    def test_user_register_form_terms_on(self):
+        """Si terms está marcado, el formulario debe ser válido."""
+        form = UserRegisterForm(data={
+            "name": "Test User",
+            "email": "test@example.com",
+            "password": "password123",
+            "password_confirm": "password123",
+            "terms": True,
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_user_register_form_passwords_mismatch(self):
+        """Las contraseñas deben coincidir."""
+        form = UserRegisterForm(data={
+            "name": "Test User",
+            "email": "test@example.com",
+            "password": "password123",
+            "password_confirm": "different_password",
+            "terms": True,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+    def test_user_register_form_empty_fields(self):
+        """Los campos obligatorios no pueden estar vacíos."""
+        form = UserRegisterForm(data={})
+        self.assertFalse(form.is_valid())
+        self.assertIn("name", form.errors)
+        self.assertIn("email", form.errors)
+        self.assertIn("password", form.errors)
+        self.assertIn("password_confirm", form.errors)
+
+    def test_user_login_form_valid(self):
+        """Login con datos válidos."""
+        form = UserLoginForm(data={
+            "email": "test@example.com",
+            "password": "password123",
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_user_login_form_missing_email(self):
+        """Email es obligatorio en login."""
+        form = UserLoginForm(data={
+            "password": "password123",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_user_login_form_invalid_email_format(self):
+        """Email debe tener formato válido."""
+        form = UserLoginForm(data={
+            "email": "not-an-email",
+            "password": "password123",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_edit_profile_form_valid(self):
+        """Formulario de edición de perfil válido."""
+        form = EditProfileForm(data={
+            "first_name": "Juan",
+            "last_name": "Pérez",
+            "email": "juan@example.com",
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_edit_profile_form_missing_email(self):
+        """Email es obligatorio en perfil."""
+        form = EditProfileForm(data={
+            "first_name": "Juan",
+            "last_name": "Pérez",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_change_password_form_passwords_mismatch(self):
+        """Las nuevas contraseñas deben coincidir."""
+        form = ChangePasswordForm(data={
+            "current_password": "oldpass123",
+            "new_password": "newpass123",
+            "confirm_password": "differentpass",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+    def test_change_password_form_short_password(self):
+        """La nueva contraseña debe tener al menos 8 caracteres."""
+        form = ChangePasswordForm(data={
+            "current_password": "oldpass123",
+            "new_password": "short",
+            "confirm_password": "short",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+    def test_shipping_address_form_valid(self):
+        """Dirección con datos válidos."""
+        form = ShippingAddressForm(data={
+            "full_name": "Juan Pérez",
+            "address_line_1": "Calle Mayor 123",
+            "city": "Almería",
+            "postal_code": "04001",
+            "country": "España",
+            "phone": "612345678",
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_shipping_address_form_missing_required_fields(self):
+        """Campos obligatorios no pueden estar vacíos."""
+        form = ShippingAddressForm(data={})
+        self.assertFalse(form.is_valid())
+        self.assertIn("full_name", form.errors)
+        self.assertIn("address_line_1", form.errors)
+        self.assertIn("city", form.errors)
+        self.assertIn("postal_code", form.errors)
+        self.assertIn("phone", form.errors)
+
+    def test_reset_password_form_valid_email(self):
+        """Formulario de recuperación de contraseña."""
+        form = ResetPasswordForm(data={
+            "email": "test@example.com",
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_reset_password_form_invalid_email(self):
+        """Email inválido."""
+        form = ResetPasswordForm(data={
+            "email": "not-an-email",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_reset_password_phase2_form_valid(self):
+        """Cambio de contraseña válido."""
+        form = ResetPasswordPhase2Form(data={
+            "password": "newpass123",
+            "verify_password": "newpass123",
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_reset_password_phase2_form_mismatch(self):
+        """Las contraseñas deben coincidir."""
+        form = ResetPasswordPhase2Form(data={
+            "password": "newpass123",
+            "verify_password": "different",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+
+# ==================== ENDPOINT VIEW TESTS ====================
     
     def setUp(self):
         self.user_data = {
@@ -1455,6 +1635,7 @@ class EndpointViewTests(TestCase):
             "email": "nuevo@example.com",
             "password": self.password,
             "password_confirm": self.password,
+            "terms": "on",
         })
         self.assertEqual(register_response.status_code, 302)
         confirm_delay.assert_called_once()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from django.db import models
 from django.contrib.auth.models import User, AbstractUser
 from django.utils.crypto import get_random_string
@@ -83,8 +84,9 @@ class Image(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=200, default="")
-    description = models.TextField(default = "")
-    briefdesc = models.TextField(default = "")
+    sku = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    description = models.TextField(default = "", max_length=5000)
+    briefdesc = models.TextField(default = "", max_length=250)
     price = models.FloatField(default = 0)
     stock = models.PositiveIntegerField(default=0)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
@@ -106,6 +108,7 @@ class Product(models.Model):
     def to_dict(self):
         return {
             "name": self.name,
+            "sku": self.sku,
             "description": self.description,
             "briefdesc": self.briefdesc,
             "price": self.price,
@@ -342,8 +345,32 @@ class ShippingAddress(models.Model):
     def __str__(self):
         return f"{self.full_name} - {self.city}"
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from django.conf import settings
+        from .vars import ALMERIA_POSTAL_CODE_PREFIX, ALMERIA_MUNICIPALITIES_DISPLAY
+        from .views import _normalize_location_text
+
+        postal_code = (self.postal_code or "").strip()
+        city = (self.city or "").strip()
+
+        almeria_prefix = getattr(settings, 'POSTGRES_ENABLED', False) and "04" or ALMERIA_POSTAL_CODE_PREFIX
+
+        if len(postal_code) != 5 or not postal_code.isdigit() or not postal_code.startswith(almeria_prefix):
+            raise ValidationError({
+                'postal_code': 'Solo realizamos envíos en la provincia de Almería (código postal 04xxx).'
+            })
+
+        normalized_city = _normalize_location_text(city)
+        normalized_municipalities = {_normalize_location_text(m) for m in ALMERIA_MUNICIPALITIES_DISPLAY}
+
+        if normalized_city not in normalized_municipalities:
+            raise ValidationError({
+                'city': 'El pueblo/ciudad debe pertenecer a la provincia de Almería.'
+            })
+
     def save(self, *args, **kwargs):
-        # Si se marca como predeterminada, desmarcar las demás del usuario
+        self.full_clean()
         if self.is_default:
             ShippingAddress.objects.filter(user=self.user, is_default=True).update(is_default=False)
         super().save(*args, **kwargs)

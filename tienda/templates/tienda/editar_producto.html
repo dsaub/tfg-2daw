@@ -13,67 +13,9 @@
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
                     {% csrf_token %}
-                    
-                    <!-- Nombre del producto -->
-                    <div class="mb-3">
-                        <label for="name" class="form-label">Nombre del Producto <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="name" name="name" required maxlength="200" 
-                               value="{{ producto.name }}" placeholder="Ej: iPhone 15 Pro Max">
-                    </div>
+                    {{ form.as_p }}
 
-                    <!-- Descripción breve -->
-                    <div class="mb-3">
-                        <label for="briefdesc" class="form-label">Descripción Breve</label>
-                        <input type="text" class="form-control" id="briefdesc" name="briefdesc" maxlength="250"
-                               value="{{ producto.briefdesc }}" placeholder="Una descripción corta para mostrar en las tarjetas de producto">
-                        <div class="form-text">Opcional. Se mostrará en las vistas de listado de productos.</div>
-                    </div>
-
-                    <!-- Descripción completa -->
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Descripción Completa <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="description" name="description" rows="5" required
-                                  placeholder="Describe tu producto en detalle...">{{ producto.description }}</textarea>
-                    </div>
-
-                    <!-- Precio -->
-                    <div class="mb-3">
-                        <label for="price" class="form-label">Precio <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text">€</span>
-                            <input type="number" class="form-control" id="price" name="price" required 
-                                   min="0" step="0.01" value="{{ producto.price }}" placeholder="0.00">
-                        </div>
-                    </div>
-
-                    <!-- Stock -->
-                    <div class="mb-3">
-                        <label for="stock" class="form-label">Stock disponible <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="stock" name="stock" required
-                               min="0" step="1" value="{{ producto.stock }}" placeholder="0">
-                        <div class="form-text">Cantidad máxima que podrán comprar los clientes.</div>
-                    </div>
-
-                    <!-- Categoría -->
-                    <div class="mb-3">
-                        <label for="category" class="form-label">Categoría <span class="text-danger">*</span></label>
-                        <select class="form-select" id="category" name="category" required>
-                            <option value="" disabled>Selecciona una categoría</option>
-                            {% for category in categories %}
-                            <option value="{{ category.id }}" {% if producto.category.id == category.id %}selected{% endif %}>{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Imagen principal -->
-                    <div class="mb-3">
-                        <label for="primary_image" class="form-label">Imagen Principal</label>
-                        <input type="file" class="form-control" id="primary_image" name="primary_image" 
-                               accept="image/*">
-                        <div class="form-text">Opcional. Si subes una nueva, reemplazará la actual.</div>
-                    </div>
-
-                    <!-- Imágenes secundarias -->
+                    <!-- Imágenes secundarias (no incluidas en el form) -->
                     <div class="mb-4">
                         <label for="secondary_images" class="form-label">Imágenes Secundarias</label>
                         <input type="file" class="form-control" id="secondary_images" name="secondary_images" 

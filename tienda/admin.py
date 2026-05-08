@@ -1,17 +1,74 @@
 from django.contrib import admin
 from .models import Category, Image, Product, Cart, CartItem, Order, OrderItem, OrderMessage, StockReservation, StockReservationItem, User, VerificationCode, SavedPaymentMethod
 # Register your models here.
+from django.shortcuts import redirect
+from django.urls import path
+from django.contrib import messages
+from . import tasks
 
 admin.site.register(Category)
 admin.site.register(Image)
-admin.site.register(User)
 admin.site.register(VerificationCode)
 
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    search_fields = ('username',)
+    actions = ['banear_usuario_action', 'desbanear_usuario_action']
+    def has_change_permission(self, request, obj = ...):
+        return super().has_change_permission(request, obj)
+    
+    def banear_usuario_action(self, request, queryset):
+        usuarios_baneados = 0
+        for user in queryset:
+            user: User = user
+            # Desactiva usuario
+            if user.registration_status == User.RegisterStatus.BANNED:
+                continue
+            
+            user.is_active = False
+            user.registration_status = User.RegisterStatus.BANNED
+            user.save()
+
+            # Enviar task a Worker
+            tasks.banear_usuario.delay(user.email)
+
+            # Borrar productos
+            Product.objects.filter(creator=user).delete()
+            usuarios_baneados+=1
+        self.message_user(
+            request,
+            f"Se ha(n) baneado {usuarios_baneados} usuario(s) correctamente.",
+            level=messages.SUCCESS
+        )
+    def desbanear_usuario_action(self, request, queryset):
+        user_desbaneados = 0
+        for user in queryset:
+            user: User = user
+            if user.registration_status != User.RegisterStatus.BANNED:
+                continue
+            
+            user.is_active = True
+            user.registration_status = User.RegisterStatus.ACTIVE
+            user.save()
+
+            tasks.desbanear_usuario.delay(user.email)
+
+            user_desbaneados -= 1
+        self.message_user(
+            request,
+            f"Se ha(n) desbaneado {user_desbaneados} usuario(s)",
+            level=messages.SUCCESS
+        )
+
+
+    
+    banear_usuario_action.short_description = "Banear usuarios seleccionados"
+    desbanear_usuario_action.short_description = "Desbanear usuarios seleccionados"
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'price', 'stock', 'category', 'creator')
-    search_fields = ('name', 'creator__username', 'creator__email')
+    list_display = ('id', 'sku', 'name', 'price', 'stock', 'category', 'creator')
+    search_fields = ('name', 'sku', 'creator__username', 'creator__email')
     list_filter = ('category',)
 class CartItemInline(admin.TabularInline):
     model = CartItem

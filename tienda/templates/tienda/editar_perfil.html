@@ -37,18 +37,7 @@
             <div class="card-body">
                 <form method="POST">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="first_name" class="form-label">Nombre</label>
-                        <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user.first_name }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="last_name" class="form-label">Apellidos</label>
-                        <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user.last_name }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Correo Electrónico</label>
-                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
-                    </div>
+                    {{ form.as_p }}
                     <div class="mb-3">
                         <label for="username" class="form-label">Nombre de Usuario</label>
                         <input type="text" class="form-control" id="username" value="{{ user.username }}" disabled>
@@ -69,19 +58,7 @@
             <div class="card-body">
                 <form method="POST" action="{% url 'cambiar_contrasena' %}">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="current_password" class="form-label">Contraseña Actual</label>
-                        <input type="password" class="form-control" id="current_password" name="current_password" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_password" class="form-label">Nueva Contraseña</label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" required>
-                        <small class="text-muted">Mínimo 8 caracteres</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="confirm_password" class="form-label">Confirmar Nueva Contraseña</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                    </div>
+                    {{ password_form.as_p }}
                     <button type="submit" class="btn btn-warning">Cambiar Contraseña</button>
                 </form>
             </div>

@@ -8,3 +8,4 @@ __pycache__/
 tienda/__pycache__/
 proyecto/__pycache__/
 media
+staticfiles

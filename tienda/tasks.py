@@ -11,13 +11,31 @@ from .models import User, VerificationCode
 @shared_task
 def enviar_correo_bienvenida(email_usuario: str, nombre_usuario: str):
     html_content = render_to_string(
-        'emails/welcome.html',
+        'tienda/emails/welcome.html',
         {
             "name": nombre_usuario
         },
-        using='jinja2'
     )
     send_hemail(email_usuario, "Inicio de Sesión correcto", html_content, "Has iniciado sesión...")
+
+@shared_task
+def banear_usuario(email_usuario: str):
+    html_content = render_to_string(
+        'tienda/emails/ban.html',
+        {
+        },
+    )
+
+    send_hemail(email_usuario, "Cuenta Bloqueada", html_content, "Tu cuenta ha sido bloqueada...")
+
+@shared_task
+def desbanear_usuario(email_usuario: str):
+    html_content = render_to_string(
+        'tienda/emails/unban.html',
+        {},
+    )
+
+    send_hemail(email_usuario, "Cuenta Desbloqueada", html_content, "Tu cuenta ha sido desbloqueada...")
 
 @shared_task
 def enviar_correo_confirmacion(id: int):
@@ -33,7 +51,11 @@ def enviar_correo_confirmacion(id: int):
 
 @shared_task
 def enviar_correo_recuperacion(email: str):
-    usuario = User.objects.get(email=email)
+    usuario: User | None
+    try:
+        usuario = User.objects.get(email=email)
+    except User.DoesNotExist as e:
+        usuario = None
     if usuario is not None:
         ver_code = VerificationCode.objects.create(
             code_mode = VerificationCode.VerificationModes.RESET_PASSWORD,
@@ -42,18 +64,18 @@ def enviar_correo_recuperacion(email: str):
         )
         ver_code.save()
         html_content = render_to_string(
-            'emails/reset_pass.html',
+            'tienda/emails/reset_pass.html',
             {
                 "name": usuario.get_full_name(),
                 "domain": settings.DOMAIN,
                 "protocol": settings.PROTOCOL,
                 "code": ver_code.code
             },
-            using='jinja2'
         )
 
         send_hemail(email, "Reset de Contraseña", html_content, "Estas reseteando la contraseña...")
-
+    else:
+        print("User does not exist, Cancelling TASK.")
 
 # Purchased items should be a list of dictionary, the dictionary must follow this tags: amount, product name, price (each)
 @shared_task

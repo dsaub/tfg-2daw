@@ -14,6 +14,7 @@ import logging
 import os, sys
 from pathlib import Path
 
+DEV_ENV = (sys.argv[1] == 'runserver')
 
 RUNNING_TESTS = any(arg in {'test', 'pytest'} for arg in sys.argv) or 'PYTEST_CURRENT_TEST' in os.environ
 
@@ -101,6 +102,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.forms',
     'compressor',
 ]
 
@@ -136,14 +138,6 @@ TEMPLATES = [
             ],
         },
     },
-    {
-        'BACKEND': 'django.template.backends.jinja2.Jinja2',
-        'DIRS': [BASE_DIR / 'templates/jinja2'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'environment': 'proyecto.jinja2.environment',
-        },
-    }
 ]
 
 WSGI_APPLICATION = 'proyecto.wsgi.application'
@@ -216,6 +210,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+COMPRESS_ROOT = STATIC_ROOT
+COMPRESS_URL = STATIC_URL
 STATICFILES_DIRS = [
     BASE_DIR / 'tienda' / 'static',
 ]
@@ -428,3 +424,10 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 USE_X_FORWARDED_HOST = True
 SECURE_REFERER_POLICY = "strict-origin-when-cross-origin"
+
+from django.forms.renderers import TemplatesSetting
+
+class CustomFormRenderer(TemplatesSetting):
+    form_template_name = "tienda/form_snippet.html"
+
+FORM_RENDERER = "proyecto.settings.CustomFormRenderer"
