@@ -401,10 +401,22 @@ def producto(request: HttpRequest, id: int):
         cache.set(cache_key, product, 300)
     
     can_review = False
-    if request.user.is_authenticated:
-        can_review = product.has_user_purchased(request.user) and not Review.objects.filter(product=product, user=request.user).exists()
+    user_has_review = False
+    user_review_id = None
     
-    return render(request, "tienda/producto.html", {"product": product, "can_review": can_review})
+    if request.user.is_authenticated:
+        user_review = Review.objects.filter(product=product, user=request.user).first()
+        if user_review:
+            user_has_review = True
+            user_review_id = user_review.id
+        can_review = product.has_user_purchased(request.user) and not user_review
+    
+    return render(request, "tienda/producto.html", {
+        "product": product, 
+        "can_review": can_review,
+        "user_has_review": user_has_review,
+        "user_review_id": user_review_id
+    })
 
 def categoria(request: HttpRequest, id: int):
     page = 1
@@ -2413,3 +2425,12 @@ def product_reviews(request: HttpRequest, product_id: int):
         "reviews_count": product.get_reviews_count(),
         "can_review": request.user.is_authenticated and product.has_user_purchased(request.user) and not Review.objects.filter(product=product, user=request.user).exists()
     })
+
+
+@login_required
+def delete_review(request: HttpRequest, review_id: int):
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    product_id = review.product_id
+    review.delete()
+    messages.success(request, "Tu valoración ha sido eliminada.")
+    return redirect(reverse("producto", args=[product_id]))

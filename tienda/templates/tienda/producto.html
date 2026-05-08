@@ -75,6 +75,14 @@
                 </div>
                 {% if can_review %}
                 <a href="{% url 'add_review' product.id %}" class="btn btn-sm btn-outline-primary ms-auto">Valorar este producto</a>
+                {% elif user_has_review %}
+                <div class="ms-auto">
+                    <a href="{% url 'add_review' product.id %}" class="btn btn-sm btn-outline-primary">Editar mi valoración</a>
+                    <form method="post" action="{% url 'delete_review' product.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta valoración?');">Eliminar</button>
+                    </form>
+                </div>
                 {% elif user.is_authenticated %}
                 <span class="text-muted ms-auto">Solo puedes valorar productos que hayas comprado</span>
                 {% else %}
@@ -115,6 +123,15 @@ async function loadReviews() {
                     });
                     imagesHtml += '</div>';
                 }
+                const actionsHtml = review.is_owner 
+                    ? `<div class="mt-2">
+                         <a href="/tienda/producto/${review.id}/valorar/" class="btn btn-sm btn-outline-primary me-1">Editar</a>
+                         <form method="post" action="/tienda/producto/${review.id}/valorar/eliminar/" style="display:inline;">
+                           {% csrf_token %}
+                           <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta valoración?');">Eliminar</button>
+                         </form>
+                       </div>`
+                    : '';
                 reviewsHtml += `
                     <div class="card mb-3">
                         <div class="card-body">
@@ -128,6 +145,7 @@ async function loadReviews() {
                             <h6 class="mt-2">${review.title}</h6>
                             <p class="mb-1">${review.content}</p>
                             ${imagesHtml}
+                            ${actionsHtml}
                         </div>
                     </div>
                 `;
