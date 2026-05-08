@@ -14,7 +14,7 @@ import logging
 import os, sys
 from pathlib import Path
 
-DEV_ENV = (sys.argv[1] == 'runserver')
+DEV_ENV = len(sys.argv) > 1 and sys.argv[1] == 'runserver'
 
 RUNNING_TESTS = any(arg in {'test', 'pytest'} for arg in sys.argv) or 'PYTEST_CURRENT_TEST' in os.environ
 
@@ -307,9 +307,6 @@ SECURITY = os.getenv('SECURITY', 'tls')
 SMTP_USERNAME = os.getenv('SMTP_USERNAME', None)
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', None)
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", None)
-if not RUNNING_TESTS and (SMTP_USERNAME is None or SMTP_PASSWORD is None or SMTP_EMAIL is None):
-    print("Se requieren credenciales SMTP")
-    sys.exit(1)
 
 
 
@@ -396,8 +393,11 @@ logging.captureWarnings(True)
 
 if RUNNING_TESTS:
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
-else:
+elif SMTP_USERNAME and SMTP_PASSWORD and SMTP_EMAIL:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    print("ADVERTENCIA: Sin credenciales SMTP - usando backend console")
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 EMAIL_HOST = SMTP_ENDPOINT
 EMAIL_PORT = SMTP_PORT
@@ -407,7 +407,7 @@ EMAIL_HOST_USER = SMTP_USERNAME
 EMAIL_HOST_PASSWORD = SMTP_PASSWORD
 
 # El correo que se usará como remitente por defecto
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", SMTP_EMAIL)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL") or SMTP_EMAIL or "no-reply@localhost"
 
 # URL de Redis (asumiendo que corre en el puerto default 6379)
 CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
