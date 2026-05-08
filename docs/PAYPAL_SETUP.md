@@ -39,7 +39,7 @@ Con tus valores reales del Sandbox.
 
 ### 6. Instalar el SDK de PayPal
 ```bash
-pip install paypalrestsdk
+uv add paypalrestsdk
 ```
 
 ### 7. Usar cuentas de prueba para transacciones

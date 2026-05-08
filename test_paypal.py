@@ -33,7 +33,7 @@ def main() -> None:
         print(f"   Versión: {paypalrestsdk.__version__ if hasattr(paypalrestsdk, '__version__') else 'Desconocida'}")
     except ImportError as e:
         print(f"   ❌ Error: {e}")
-        print("   SOLUCIÓN: pip install paypalrestsdk")
+        print("   SOLUCIÓN: uv add paypalrestsdk")
         sys.exit(1)
 
     # Intentar conectar a PayPal
