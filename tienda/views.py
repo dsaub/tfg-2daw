@@ -429,6 +429,13 @@ def _get_reservation_owner_filters(request: HttpRequest):
     return {"session_key": _get_or_create_session_key(request)}
 
 
+def _get_cart_item_owner_filters(request: HttpRequest):
+    """Retorna filtros para validar ownership de CartItem según el usuario."""
+    if request.user.is_authenticated:
+        return {"cart__user": request.user}
+    return {"cart__session_key": _get_or_create_session_key(request)}
+
+
 def _release_expired_stock_reservations():
     now = timezone.now()
     StockReservation.objects.filter(
@@ -821,7 +828,7 @@ def update_cart_item(request: HttpRequest, item_id: int):
     """Actualiza la cantidad de un item del carrito"""
     try:
         cart = get_or_create_cart(request)
-        cart_item = CartItem.objects.get(id=item_id, cart=cart)
+        cart_item = CartItem.objects.get(id=item_id, cart=cart, **_get_cart_item_owner_filters(request))
 
         _cancel_active_stock_reservations_for_request(request)
         _clear_stock_reservation_session(request)
@@ -860,7 +867,7 @@ def remove_from_cart(request: HttpRequest, item_id: int):
         cart = get_or_create_cart(request)
         _cancel_active_stock_reservations_for_request(request)
         _clear_stock_reservation_session(request)
-        cart_item = CartItem.objects.get(id=item_id, cart=cart)
+        cart_item = CartItem.objects.get(id=item_id, cart=cart, **_get_cart_item_owner_filters(request))
         product_name = cart_item.product.name
         cart_item.delete()
         messages.success(request, f"{product_name} eliminado del carrito.")
