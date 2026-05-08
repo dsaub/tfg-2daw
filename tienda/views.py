@@ -5,6 +5,7 @@ from django.db.utils import DataError
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode, SavedPaymentMethod
+from .forms import ProductForm, SecondaryImageForm, UserLoginForm, UserRegisterForm, ProductEditForm, EditProfileForm, ChangePasswordForm, ShippingAddressForm, ResetPasswordForm, ResetPasswordPhase2Form
 from . import tasks
 from .vars import (
     PAGE_SIZE,
@@ -86,9 +87,10 @@ def _is_almeria_city(city: str) -> bool:
     return _normalize_location_text(city) in ALMERIA_MUNICIPALITIES
 
 
-def _address_form_context(direccion=None):
+def _address_form_context(direccion=None, form=None):
     return {
         "direccion": direccion,
+        "form": form,
         "almeria_municipalities": ALMERIA_MUNICIPALITIES_DISPLAY,
     }
 
@@ -221,153 +223,144 @@ def index(request: HttpRequest):
 
 def login(request: HttpRequest):
     if request.method == "POST":
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        remember = request.POST.get("remember")
-        client_ip = _get_client_ip(request)
-        
-        # Buscar usuario por email
-        try:
-            user_obj = User.objects.get(email=email)
-            username = user_obj.username
-        except User.DoesNotExist:
-            audit_logger.warning(
-                "LOGIN_FAILED email=%s reason=user_not_found ip=%s",
-                email,
-                client_ip,
-            )
-            messages.error(request, "Correo electrónico o contraseña incorrectos.")
-            return render(request, "tienda/login.html")
-        
-        # Autenticar usuario
-        user = authenticate(request, username=username, password=password)
-        if user is None:
-            data: str = cache.get(f"tries_login_{username}")
-            logins: int
-            if data is None:
-                logins = 0
-            else:
-                logins = int(data)
+        form: UserLoginForm = UserLoginForm(request.POST)
+        if form.is_valid():
+            email: str = form.cleaned_data["email"]
+            password: str = form.cleaned_data["password"]
+            remember: bool = form.cleaned_data["remember"]
+            client_ip = _get_client_ip(request)
+            try:
+                user: User = User.objects.get(email=email)
+                username = user.username
+            except User.DoesNotExist:
+                audit_logger.warning("LOGIN FAILED email=%s reason=user_not_found ip=%s", email, client_ip)
+                messages.error(request, "El email o la contraseña es incorrecta")
+                return render(request, "tienda/login.html", {"form": form})
+            if user.registration_status == User.RegisterStatus.BANNED:
+                # Usuario baneado.
+                messages.error(request, "Esta cuenta esta bloqueada.")
+                return render(request, "tienda/login.html", {"form": form})
             
-            if logins >= 5:
-                # Si ha fallado 5 intentos de login...
-                audit_logger.info(
-                    "LOGIN_FAILED email=%s reason=rate_limited", username
-                )
-                messages.error(request, "Has sufrido de Rate Limit por fallar 5 veces la contraseña")
-                return render(request, "tienda/login.html")
-
-            logins+=1
-            cache.set(f"tries_login_{username}", str(logins), 600)
-            messages.error(request, "Correo electrónico o contraseña incorrectos.")
-            return render(request, "tienda/login.html") 
-        user = User.objects.get(username=user.username)
-        if user.registration_status == "CR":
-            audit_logger.info(
-                "LOGIN_FAILED email=%s reason=not_verified", email
-            )
-            messages.error(request, "No se puede iniciar sesión porque no has verificado tu cuenta, comprueba tu email. Si eliminaste el email pero querias verificarte, contacta con el soporte tecnico")
-            return render(request, "tienda/login.html")
-        
-        if user is not None:
+            user = authenticate(request, username = username, password=password)
+            
+            if user is None:
+                data: str = cache.get(f"tries_login_{username}")
+                logins: int
+                if data is None:
+                    logins = 0
+                else:
+                    logins = int(data)
+                
+                if logins >= 5:
+                    audit_logger.info("LOGIN FAILED email=%s reason=rate_limited", email)
+                    messages.error(request, "Has sufrido de Rate Limit por fallar 5 veces la contraseña")
+                    return render(request, "tienda/login.html", {"form": form})
+                logins+=1
+                cache.set(f"tries_login_{username}", str(logins), 600)
+                messages.error(request, "El email o la contraseña es incorrecta")
+                return render(request, "tienda/login.html", {"form": form})
+            if user.registration_status == User.RegisterStatus.CONFIRMATION_REQUIRED:
+                audit_logger.info("LOGIN_FAILED email=%s reason=not_verified", email)
+                messages.error(request, "No se puede iniciar sesión porque no has verificado tu cuenta, comprueba tu email. Si eliminaste el email pero querias verificarte, contacta con el soporte tecnico")
+                return render(request, "tienda/login.html", {"form": form})
             auth_login(request, user)
-            
-            # Configurar duración de sesión
+
             if not remember:
                 request.session.set_expiry(0)
             else:
-                request.session.set_expiry(1209600)  # 14 días en segundos
-
-            audit_logger.info(
-                "LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s",
-                user.id,
-                user.email,
-                client_ip,
-                bool(remember),
-            )
-            tasks.enviar_correo_bienvenida.delay(user.email, "{} {}".format(user.first_name, user.last_name))
-            # result = send_email(user.email, "Inicio de sesión correcto", login_message.format(name = "{} {}".format(user.first_name, user.last_name)))
+                request.session.set_expiry(1209600)
+            
+            audit_logger.info("LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s", user.id, user.email, client_ip, bool(remember))
+            tasks.enviar_correo_bienvenida.delay(user.email, f"{user.first_name} {user.last_name}")
             messages.success(request, f"¡Bienvenido {user.first_name or user.username}!")
             return redirect("index")
-        else:
-            user1: User = User.objects.get(username=username)
-            if user1.registration_status == User.RegisterStatus.BANNED:
-                    audit_logger.warning(
-                        "LOGIN FAILED email=%s reason=user_banned ip=%s",
-                        email,
-                        client_ip,
-                    )
-                    messages.error(request, "Error, La cuenta esta bloqueada")
-                    return render(request, "tienda/login.html")
-            audit_logger.warning(
-                "LOGIN_FAILED email=%s reason=invalid_credentials ip=%s",
-                email,
-                client_ip,
-            )
-            messages.error(request, "Correo electrónico o contraseña incorrectos.")
-            return render(request, "tienda/login.html")
-    
-    return render(request, "tienda/login.html")
+    else:
+        form = UserLoginForm()
+    return render(request, "tienda/login.html", {"form": form})
 
+#        
+#        if user is not None:
+#            auth_login(request, user)
+#            
+#            # Configurar duración de sesión
+#            if not remember:
+#                request.session.set_expiry(0)
+#            else:
+#                request.session.set_expiry(1209600)  # 14 días en segundos
+#
+#            audit_logger.info(
+#                "LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s",
+#                user.id,
+#                user.email,
+#                client_ip,
+#                bool(remember),
+#            )
+#            tasks.enviar_correo_bienvenida.delay(user.email, "{} {}".format(user.first_name, user.last_name))
+#            # result = send_email(user.email, "Inicio de sesión correcto", login_message.format(name = "{} {}".format(user.first_name, user.last_name)))
+#            messages.success(request, f"¡Bienvenido {user.first_name or user.username}!")
+#            return redirect("index")
+#        else:
+#            user1: User = User.objects.get(username=username)
+#            if user1.registration_status == User.RegisterStatus.BANNED:
+#                    audit_logger.warning(
+#                        "LOGIN FAILED email=%s reason=user_banned ip=%s",
+#                        email,
+#                        client_ip,
+#                    )
+#                    messages.error(request, "Error, La cuenta esta bloqueada")
+#                    return render(request, "tienda/login.html")
+#            audit_logger.warning(
+#                "LOGIN_FAILED email=%s reason=invalid_credentials ip=%s",
+#                email,
+#                client_ip,
+#            )
+#            messages.error(request, "Correo electrónico o contraseña incorrectos.")
+#            return render(request, "tienda/login.html")
+#    
+#    return render(request, "tienda/login.html")
 
 def register(request: HttpRequest):
-    if request.user.is_authenticated:
-        return redirect("index")
     if request.method == "POST":
-        name = request.POST.get("name")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        password_confirm = request.POST.get("password_confirm")
-        client_ip = _get_client_ip(request)
-        
-        # Validaciones
-        if password != password_confirm:
-            audit_logger.warning("REGISTER_FAILED email=%s reason=password_mismatch ip=%s", email, client_ip)
-            messages.error(request, "Las contraseñas no coinciden.")
-            return render(request, "tienda/register.html")
-        
-        if len(password) < 8:
-            audit_logger.warning("REGISTER_FAILED email=%s reason=password_too_short ip=%s", email, client_ip)
-            messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
-            return render(request, "tienda/register.html")
-        
-        if User.objects.filter(email=email).exists():
-            audit_logger.warning("REGISTER_FAILED email=%s reason=email_exists ip=%s", email, client_ip)
-            messages.error(request, "Ya existe un usuario con este correo electrónico.")
-            return render(request, "tienda/register.html")
-        
-        # Crear username a partir del email
-        username = email.split("@")[0]
-        
-        # Si el username ya existe, agregar un número
-        base_username = username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}{counter}"
-            counter += 1
-        
-        # Crear usuario
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=name
-        )
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            name = form.cleaned_data.get("name")
+            email = form.cleaned_data.get("email")
+            password = form.cleaned_data.get("password")
+            client_ip = _get_client_ip(request)
 
-        audit_logger.info(
-            "REGISTER_SUCCESS user_id=%s username=%s email=%s ip=%s",
-            user.id,
-            user.username,
-            user.email,
-            client_ip,
-        )
+            # Validación email
+            if User.objects.filter(email=email).exists():
+                audit_logger.warning("REGISTER_FAILED email=%s reason=email_exists ip=%s", email, client_ip)
+                messages.error(request, "Ya existe un usuario con este correo electrónico")
+                return render(request, "tienda/register.html", {"form":form})
+            
+            username = email.split("@")[0]
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            user = User.objects.create_user(
+                username = username,
+                email = email,
+                password = password,
+                first_name = name
+            )
+            audit_logger.info(
+                "REGISTER_SUCCESS user_id=%s username=%s email=%s ip=%s",
+                user.id,
+                user.username,
+                user.email,
+                client_ip,
+            )
         
 
-        tasks.enviar_correo_confirmacion.delay(user.id)
-        messages.success(request, f"¡Cuenta creada exitosamente! Por favor, verifica tu correo entrando al Link enviado.")
-        return redirect("index")
-    
-    return render(request, "tienda/register.html")
+            tasks.enviar_correo_confirmacion.delay(user.id)
+            messages.success(request, f"¡Cuenta creada exitosamente! Por favor, verifica tu correo entrando al Link enviado.")
+            return redirect("index")
+    else:
+        form = UserRegisterForm()
+    return render(request, "tienda/register.html", {"form":form})
 
 
 def logout(request: HttpRequest):
@@ -957,94 +950,32 @@ def enviar_mensaje_pedido(request: HttpRequest, item_id: int):
 
 @login_required
 def crear_producto(request: HttpRequest):
-    """Crea un nuevo producto"""
     if request.method == "POST":
-        name = request.POST.get("name")
-        briefdesc = request.POST.get("briefdesc")
-        description = request.POST.get("description")
-        price = request.POST.get("price")
-        stock = request.POST.get("stock")
-        category_id = request.POST.get("category")
-        primary_image_file = request.FILES.get("primary_image")
-        secondary_images_files = request.FILES.getlist("secondary_images")
-        
-        # Validaciones
-        if not all([name, description, price, stock, category_id]):
-            messages.error(request, "Por favor completa todos los campos obligatorios.")
-            categories = Category.objects.all()
-            return render(request, "tienda/crear_producto.html", {"categories": categories})
-        
-        try:
-            price = float(price)
-            if price < 0:
-                raise ValueError("El precio no puede ser negativo")
-        except ValueError:
-            messages.error(request, "El precio debe ser un número válido.")
-            categories = Category.objects.all()
-            return render(request, "tienda/crear_producto.html", {"categories": categories})
-
-        try:
-            stock = int(stock)
-            if stock < 0:
-                raise ValueError("El stock no puede ser negativo")
-        except ValueError:
-            messages.error(request, "El stock debe ser un número entero válido.")
-            categories = Category.objects.all()
-            return render(request, "tienda/crear_producto.html", {"categories": categories})
-        
-        try:
-            category = Category.objects.get(id=category_id)
-        except Category.DoesNotExist:
-            messages.error(request, "Categoría no válida.")
-            categories = Category.objects.all()
-            return render(request, "tienda/crear_producto.html", {"categories": categories})
-        
-        # Crear imagen principal si se proporciona
-        primary_image = None
-        if primary_image_file:
-            primary_image = Image.objects.create(
-                name=f"{name}_principal",
-                image=primary_image_file
-            )
-        if stock > 4294967295:
-            messages.error(request, "No se puede tener mas de 4294967295 existencias. Por favor, intentelo de nuevo")
-            categories = Category.objects.all()
-            return render(request, "tienda/crear_producto.html", {"categories": categories})
-        # Crear producto
-        try:
-            producto = Product.objects.create(
-                name=name,
-                briefdesc=briefdesc or "",
-                description=description,
-                price=price,
-                stock=stock,
-                category=category,
-                primary_image=primary_image,
-                creator=request.user
-            )
-        except DataError as e:
-            logger.exception("ERROR Creating product: " + str(e))
-            messages.error(request, "Se ha excedido el limite de 1000 caracteres en Descripción corta o el limite de 5000 caracteres en Descripción.")
-            categories = Category.objects.all()
-            return render(request, "tienda/crear_producto.html", {"categories": categories})
-        _invalidate_product_cache([producto.id])
-        
-        # Agregar imágenes secundarias si se proporcionan
-        if secondary_images_files:
-            for idx, img_file in enumerate(secondary_images_files):
-                secondary_img = Image.objects.create(
-                    name=f"{name}_secundaria_{idx+1}",
-                    image=img_file
+        form = ProductForm(request.POST, request.FILES)
+        if form.is_valid():
+            primary_image_file = form.cleaned_data.get("primary_image")
+            image = None
+            if primary_image_file:
+                image = Image(
+                    name = f"{form.cleaned_data['name']}_principal",
+                    image = primary_image_file,
                 )
-                producto.secondary_images.add(secondary_img)
-        
-        messages.success(request, f"¡Producto '{name}' creado exitosamente!")
-        return redirect("mis_productos")
-    
-    # GET request - mostrar formulario
-    categories = Category.objects.all()
-    return render(request, "tienda/crear_producto.html", {"categories": categories})
-
+                image.save()
+            producto: Product = Product(
+                name = form.cleaned_data["name"],
+                briefdesc = form.cleaned_data["briefdesc"],
+                description = form.cleaned_data["description"],
+                price = form.cleaned_data["price"],
+                stock = form.cleaned_data["stock"],
+                category = form.cleaned_data["category"],
+                primary_image = image,
+                creator = request.user
+            )
+            producto.save()
+            return redirect("/")
+    else:
+        form = ProductForm()
+    return render(request, "tienda/crear_producto.html", {"form":form})
 
 @login_required
 def editar_producto(request: HttpRequest, id: int):
@@ -1052,96 +983,55 @@ def editar_producto(request: HttpRequest, id: int):
     producto = get_object_or_404(Product, id=id, creator=request.user)
 
     if request.method == "POST":
-        name = request.POST.get("name")
-        briefdesc = request.POST.get("briefdesc")
-        description = request.POST.get("description")
-        price = request.POST.get("price")
-        stock = request.POST.get("stock")
-        category_id = request.POST.get("category")
-        primary_image_file = request.FILES.get("primary_image")
-        secondary_images_files = request.FILES.getlist("secondary_images")
+        form = ProductEditForm(request.POST, request.FILES)
+        if form.is_valid():
+            producto.name = form.cleaned_data["name"]
+            producto.briefdesc = form.cleaned_data.get("briefdesc", "") or ""
+            producto.description = form.cleaned_data["description"]
+            producto.price = form.cleaned_data["price"]
+            producto.stock = form.cleaned_data["stock"]
+            producto.category = form.cleaned_data["category"]
 
-        if not all([name, description, price, stock, category_id]):
-            messages.error(request, "Por favor completa todos los campos obligatorios.")
-            categories = Category.objects.all()
-            return render(request, "tienda/editar_producto.html", {
-                "categories": categories,
-                "producto": producto
-            })
+            primary_image_file = request.FILES.get("primary_image")
+            secondary_images_files = request.FILES.getlist("secondary_images")
 
-        try:
-            price = float(price)
-            if price < 0:
-                raise ValueError("El precio no puede ser negativo")
-        except ValueError:
-            messages.error(request, "El precio debe ser un número válido.")
-            categories = Category.objects.all()
-            return render(request, "tienda/editar_producto.html", {
-                "categories": categories,
-                "producto": producto
-            })
-
-        try:
-            stock = int(stock)
-            if stock < 0:
-                raise ValueError("El stock no puede ser negativo")
-            if stock > 4294967295:
-                messages.error(request, "No se puede tener mas de 4294967295 de stock.")
-                categories = Category.objects.all()
-                return render(request, "tienda/editar_producto.html", {
-                    "categories": categories,
-                    "producto": producto
-                })
-        except ValueError:
-            messages.error(request, "El stock debe ser un número entero válido.")
-            categories = Category.objects.all()
-            return render(request, "tienda/editar_producto.html", {
-                "categories": categories,
-                "producto": producto
-            })
-
-        try:
-            category = Category.objects.get(id=category_id)
-        except Category.DoesNotExist:
-            messages.error(request, "Categoría no válida.")
-            categories = Category.objects.all()
-            return render(request, "tienda/editar_producto.html", {
-                "categories": categories,
-                "producto": producto
-            })
-
-        producto.name = name
-        producto.briefdesc = briefdesc or ""
-        producto.description = description
-        producto.price = price
-        producto.stock = stock
-        producto.category = category
-
-        if primary_image_file:
-            primary_image = Image.objects.create(
-                name=f"{name}_principal",
-                image=primary_image_file
-            )
-            producto.primary_image = primary_image
-
-        producto.save()
-        _invalidate_product_cache([producto.id])
-
-        if secondary_images_files:
-            producto.secondary_images.clear()
-            for idx, img_file in enumerate(secondary_images_files):
-                secondary_img = Image.objects.create(
-                    name=f"{name}_secundaria_{idx+1}",
-                    image=img_file
+            if primary_image_file:
+                primary_image = Image.objects.create(
+                    name=f"{producto.name}_principal",
+                    image=primary_image_file
                 )
-                producto.secondary_images.add(secondary_img)
+                producto.primary_image = primary_image
 
-        messages.success(request, f"¡Producto '{name}' actualizado exitosamente!")
-        return redirect("mis_productos")
+            producto.save()
+            _invalidate_product_cache([producto.id])
+
+            if secondary_images_files:
+                producto.secondary_images.clear()
+                for idx, img_file in enumerate(secondary_images_files):
+                    secondary_img = Image.objects.create(
+                        name=f"{producto.name}_secundaria_{idx+1}",
+                        image=img_file
+                    )
+                    producto.secondary_images.add(secondary_img)
+
+            messages.success(request, f"¡Producto '{producto.name}' actualizado exitosamente!")
+            return redirect("mis_productos")
+        else:
+            messages.error(request, "Por favor completa todos los campos obligatorios.")
+    else:
+        initial = {
+            "name": producto.name,
+            "briefdesc": producto.briefdesc,
+            "description": producto.description,
+            "price": producto.price,
+            "stock": producto.stock,
+            "category": producto.category,
+        }
+        form = ProductEditForm(initial=initial)
 
     categories = Category.objects.all()
     return render(request, "tienda/editar_producto.html", {
-        "categories": categories,
+        "form": form,
         "producto": producto
     })
 
@@ -1159,6 +1049,55 @@ def borrar_producto(request: HttpRequest, id: int):
     producto.delete()
     messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
     return redirect("mis_productos")
+
+
+@login_required
+def gestionar_imagenes(request: HttpRequest, id: int):
+    """Gestiona las imágenes secundarias de un producto"""
+    producto = get_object_or_404(Product, id=id, creator=request.user)
+    secondary_images = producto.secondary_images.all()
+    form = SecondaryImageForm()
+
+    if request.method == "POST":
+        form = SecondaryImageForm(request.POST, request.FILES)
+        if form.is_valid():
+            image = Image(
+                name = f"{producto.name}_secundaria_{secondary_images.count() + 1}",
+                image = form.cleaned_data["image"],
+                alt = form.cleaned_data.get("alt", "")
+            )
+            image.save()
+            producto.secondary_images.add(image)
+            _invalidate_product_cache([producto.id])
+            messages.success(request, "Imagen añadida correctamente.")
+            return redirect("gestionar_imagenes", id=producto.id)
+
+    return render(request, "tienda/gestionar_imagenes.html", {
+        "producto": producto,
+        "secondary_images": secondary_images,
+        "form": form
+    })
+
+
+@login_required
+def eliminar_imagen_secundaria(request: HttpRequest, product_id: int, image_id: int):
+    """Elimina una imagen secundaria de un producto"""
+    if request.method != "POST":
+        messages.error(request, "Acción no permitida.")
+        return redirect("gestionar_imagenes", id=product_id)
+
+    producto = get_object_or_404(Product, id=product_id, creator=request.user)
+    image = get_object_or_404(Image, id=image_id)
+
+    if not producto.secondary_images.filter(id=image_id).exists():
+        messages.error(request, "Esta imagen no pertenece al producto.")
+        return redirect("gestionar_imagenes", id=product_id)
+
+    producto.secondary_images.remove(image)
+    image.delete()
+    _invalidate_product_cache([producto.id])
+    messages.success(request, "Imagen eliminada correctamente.")
+    return redirect("gestionar_imagenes", id=product_id)
 
 @login_required
 def checkout(request: HttpRequest):
@@ -2106,58 +2045,59 @@ def mis_recibos(request: HttpRequest):
 def editar_perfil(request: HttpRequest):
     """Edita la información del perfil del usuario"""
     if request.method == "POST":
-        first_name = request.POST.get("first_name", "").strip()
-        last_name = request.POST.get("last_name", "").strip()
-        email = request.POST.get("email", "").strip()
-        
-        # Validar email único (excepto el propio)
-        if email != request.user.email and User.objects.filter(email=email).exists():
-            messages.error(request, "Ya existe un usuario con este correo electrónico.")
-            return render(request, "tienda/editar_perfil.html")
-        
-        # Actualizar usuario
-        request.user.first_name = first_name
-        request.user.last_name = last_name
-        request.user.email = email
-        request.user.save()
-        
-        messages.success(request, "Perfil actualizado correctamente.")
-        return redirect("portal_usuario")
+        form = EditProfileForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+            
+            if email != request.user.email and User.objects.filter(email=email).exists():
+                messages.error(request, "Ya existe un usuario con este correo electrónico.")
+                return render(request, "tienda/editar_perfil.html", {"form": form})
+            
+            request.user.first_name = form.cleaned_data["first_name"]
+            request.user.last_name = form.cleaned_data["last_name"]
+            request.user.email = email
+            request.user.save()
+            
+            messages.success(request, "Perfil actualizado correctamente.")
+            return redirect("portal_usuario")
+    else:
+        initial = {
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "email": request.user.email,
+        }
+        form = EditProfileForm(initial=initial)
     
-    return render(request, "tienda/editar_perfil.html")
+    return render(request, "tienda/editar_perfil.html", {"form": form})
 
 
 @login_required
 def cambiar_contrasena(request: HttpRequest):
     """Cambia la contraseña del usuario"""
     if request.method == "POST":
-        current_password = request.POST.get("current_password")
-        new_password = request.POST.get("new_password")
-        confirm_password = request.POST.get("confirm_password")
-        
-        # Verificar contraseña actual
-        if not request.user.check_password(current_password):
-            messages.error(request, "La contraseña actual es incorrecta.")
-            return render(request, "tienda/editar_perfil.html")
-        
-        # Validar nueva contraseña
-        if new_password != confirm_password:
-            messages.error(request, "Las contraseñas nuevas no coinciden.")
-            return render(request, "tienda/editar_perfil.html")
-        
-        if len(new_password) < 8:
-            messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
-            return render(request, "tienda/editar_perfil.html")
-        
-        # Cambiar contraseña
-        request.user.set_password(new_password)
-        request.user.save()
-        
-        # Mantener la sesión activa
-        auth_login(request, request.user)
-        
-        messages.success(request, "Contraseña actualizada correctamente.")
-        return redirect("portal_usuario")
+        form = ChangePasswordForm(request.POST)
+        if form.is_valid():
+            current_password = form.cleaned_data["current_password"]
+            new_password = form.cleaned_data["new_password"]
+            
+            if not request.user.check_password(current_password):
+                messages.error(request, "La contraseña actual es incorrecta.")
+                return render(request, "tienda/editar_perfil.html", {"password_form": ChangePasswordForm()})
+            
+            if len(new_password) < 8:
+                messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
+                return render(request, "tienda/editar_perfil.html", {"password_form": ChangePasswordForm()})
+            
+            request.user.set_password(new_password)
+            request.user.save()
+            
+            auth_login(request, request.user)
+            
+            messages.success(request, "Contraseña actualizada correctamente.")
+            return redirect("portal_usuario")
+        else:
+            messages.error(request, "Las contraseñas nuevas no coinciden o son inválidas.")
+            return render(request, "tienda/editar_perfil.html", {"password_form": form})
     
     return redirect("editar_perfil")
 
@@ -2176,45 +2116,39 @@ def direcciones_usuario(request: HttpRequest):
 def crear_direccion(request: HttpRequest):
     """Crea una nueva dirección de entrega"""
     if request.method == "POST":
-        full_name = request.POST.get("full_name", "").strip()
-        address_line_1 = request.POST.get("address_line_1", "").strip()
-        address_line_2 = request.POST.get("address_line_2", "").strip()
-        city = request.POST.get("city", "").strip()
-        postal_code = request.POST.get("postal_code", "").strip()
-        country = SHIPPING_COUNTRY
-        phone = request.POST.get("phone", "").strip()
-        is_default = request.POST.get("is_default") == "on"
-        
-        # Validaciones
-        if not all([full_name, address_line_1, city, postal_code, phone]):
+        form = ShippingAddressForm(request.POST)
+        if form.is_valid():
+            city = form.cleaned_data["city"]
+            postal_code = form.cleaned_data["postal_code"]
+            
+            if not _is_almeria_city(city):
+                messages.error(request, "El pueblo/ciudad debe pertenecer a la provincia de Almería.")
+                return render(request, "tienda/editar_direccion.html", _address_form_context(form=form))
+
+            if not _is_almeria_postal_code(postal_code):
+                messages.error(request, "Solo realizamos envíos en la provincia de Almería (código postal 04xxx).")
+                return render(request, "tienda/editar_direccion.html", _address_form_context(form=form))
+            
+            ShippingAddress.objects.create(
+                user=request.user,
+                full_name=form.cleaned_data["full_name"],
+                address_line_1=form.cleaned_data["address_line_1"],
+                address_line_2=form.cleaned_data.get("address_line_2", "") or "",
+                city=city,
+                postal_code=postal_code,
+                country=SHIPPING_COUNTRY,
+                phone=form.cleaned_data["phone"],
+                is_default=form.cleaned_data.get("is_default", False)
+            )
+            
+            messages.success(request, "Dirección creada correctamente.")
+            return redirect("direcciones_usuario")
+        else:
             messages.error(request, "Por favor completa todos los campos obligatorios.")
-            return render(request, "tienda/editar_direccion.html", _address_form_context(request.POST))
-
-        if not _is_almeria_city(city):
-            messages.error(request, "El pueblo/ciudad debe pertenecer a la provincia de Almería.")
-            return render(request, "tienda/editar_direccion.html", _address_form_context(request.POST))
-
-        if not _is_almeria_postal_code(postal_code):
-            messages.error(request, "Solo realizamos envíos en la provincia de Almería (código postal 04xxx).")
-            return render(request, "tienda/editar_direccion.html", _address_form_context(request.POST))
-        
-        # Crear dirección
-        ShippingAddress.objects.create(
-            user=request.user,
-            full_name=full_name,
-            address_line_1=address_line_1,
-            address_line_2=address_line_2,
-            city=city,
-            postal_code=postal_code,
-            country=country,
-            phone=phone,
-            is_default=is_default
-        )
-        
-        messages.success(request, "Dirección creada correctamente.")
-        return redirect("direcciones_usuario")
+    else:
+        form = ShippingAddressForm()
     
-    return render(request, "tienda/editar_direccion.html", _address_form_context())
+    return render(request, "tienda/editar_direccion.html", _address_form_context(form=form))
 
 
 @login_required
@@ -2223,34 +2157,47 @@ def editar_direccion(request: HttpRequest, id: int):
     direccion = get_object_or_404(ShippingAddress, id=id, user=request.user)
     
     if request.method == "POST":
-        direccion.full_name = request.POST.get("full_name", "").strip()
-        direccion.address_line_1 = request.POST.get("address_line_1", "").strip()
-        direccion.address_line_2 = request.POST.get("address_line_2", "").strip()
-        direccion.city = request.POST.get("city", "").strip()
-        direccion.postal_code = request.POST.get("postal_code", "").strip()
-        direccion.country = SHIPPING_COUNTRY
-        direccion.phone = request.POST.get("phone", "").strip()
-        direccion.is_default = request.POST.get("is_default") == "on"
-        
-        # Validaciones
-        if not all([direccion.full_name, direccion.address_line_1, direccion.city, 
-                   direccion.postal_code, direccion.phone]):
+        form = ShippingAddressForm(request.POST)
+        if form.is_valid():
+            city = form.cleaned_data["city"]
+            postal_code = form.cleaned_data["postal_code"]
+            
+            if not _is_almeria_city(city):
+                messages.error(request, "El pueblo/ciudad debe pertenece a la provincia de Almería.")
+                return render(request, "tienda/editar_direccion.html", _address_form_context(direccion, form=form))
+
+            if not _is_almeria_postal_code(postal_code):
+                messages.error(request, "Solo realizamos envíos en la provincia de Almería (código postal 04xxx).")
+                return render(request, "tienda/editar_direccion.html", _address_form_context(direccion, form=form))
+            
+            direccion.full_name = form.cleaned_data["full_name"]
+            direccion.address_line_1 = form.cleaned_data["address_line_1"]
+            direccion.address_line_2 = form.cleaned_data.get("address_line_2", "") or ""
+            direccion.city = city
+            direccion.postal_code = postal_code
+            direccion.country = SHIPPING_COUNTRY
+            direccion.phone = form.cleaned_data["phone"]
+            direccion.is_default = form.cleaned_data.get("is_default", False)
+            
+            direccion.save()
+            messages.success(request, "Dirección actualizada correctamente.")
+            return redirect("direcciones_usuario")
+        else:
             messages.error(request, "Por favor completa todos los campos obligatorios.")
-            return render(request, "tienda/editar_direccion.html", _address_form_context(direccion))
-
-        if not _is_almeria_city(direccion.city):
-            messages.error(request, "El pueblo/ciudad debe pertenecer a la provincia de Almería.")
-            return render(request, "tienda/editar_direccion.html", _address_form_context(direccion))
-
-        if not _is_almeria_postal_code(direccion.postal_code):
-            messages.error(request, "Solo realizamos envíos en la provincia de Almería (código postal 04xxx).")
-            return render(request, "tienda/editar_direccion.html", _address_form_context(direccion))
-        
-        direccion.save()
-        messages.success(request, "Dirección actualizada correctamente.")
-        return redirect("direcciones_usuario")
+    else:
+        initial = {
+            "full_name": direccion.full_name,
+            "address_line_1": direccion.address_line_1,
+            "address_line_2": direccion.address_line_2,
+            "city": direccion.city,
+            "postal_code": direccion.postal_code,
+            "country": direccion.country,
+            "phone": direccion.phone,
+            "is_default": direccion.is_default,
+        }
+        form = ShippingAddressForm(initial=initial)
     
-    return render(request, "tienda/editar_direccion.html", _address_form_context(direccion))
+    return render(request, "tienda/editar_direccion.html", _address_form_context(direccion, form=form))
 
 
 @login_required
@@ -2336,10 +2283,13 @@ def ayuda(request: HttpRequest):
 
 def reset_password(request: HttpRequest):
     if request.method == "GET":
-        return render(request, "tienda/reset_password.html", {})
+        form = ResetPasswordForm()
+        return render(request, "tienda/reset_password.html", {"form": form})
     else:
-        tasks.enviar_correo_recuperacion.delay(request.POST["email"])
-        messages.info(request, "Si tienes una cuenta con ese correo electronico, se ha enviado un correo con un enlace")
+        form = ResetPasswordForm(request.POST)
+        if form.is_valid():
+            tasks.enviar_correo_recuperacion.delay(form.cleaned_data["email"])
+            messages.info(request, "Si tienes una cuenta con ese correo electronico, se ha enviado un correo con un enlace")
         return render(request, "tienda/index.html", {})
     
 def reset_password_phase2(request: HttpRequest, code: str):
@@ -2352,22 +2302,19 @@ def reset_password_phase2(request: HttpRequest, code: str):
 
 
     if request.method == "GET":
-        return render(request, "tienda/reset_password_phase2.html", {
-            "code": code
-        })
+        form = ResetPasswordPhase2Form()
+        return render(request, "tienda/reset_password_phase2.html", {"form": form, "code": code})
     elif request.method == "POST":
-        password = request.POST["password"]
-        vpassword = request.POST["verify_password"]
-        if password != vpassword:
+        form = ResetPasswordPhase2Form(request.POST)
+        if form.is_valid():
+            user = ver_code.user
+            user.set_password(form.cleaned_data["password"])
+            user.save()
+            ver_code.delete()
+            messages.success(request, "Se ha cambiado la contraseña!")
+            return redirect(reverse("index"))
+        else:
             messages.error(request, "Las contraseñas no coinciden")
-            return render(request, "tienda/reset_password_phase2.html", {"code": code})
-
-        user = ver_code.user
-        user.set_password(password)
-        user.save()
-        ver_code.delete() # Delete Verification code after changing password
-        messages.success(request, "Se ha cambiado la contraseña!")
-        return redirect(reverse("index"))
-        
+            return render(request, "tienda/reset_password_phase2.html", {"form": form, "code": code})
     else:
         raise Http404()

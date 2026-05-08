@@ -21,52 +21,7 @@
             <div class="card-body">
                 <form method="POST">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="full_name" class="form-label">Nombre Completo *</label>
-                        <input type="text" class="form-control" id="full_name" name="full_name" value="{{ direccion.full_name|default:'' }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="address_line_1" class="form-label">Dirección *</label>
-                        <input type="text" class="form-control" id="address_line_1" name="address_line_1" value="{{ direccion.address_line_1|default:'' }}" placeholder="Calle, número, piso, puerta" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="address_line_2" class="form-label">Dirección (línea 2)</label>
-                        <input type="text" class="form-control" id="address_line_2" name="address_line_2" value="{{ direccion.address_line_2|default:'' }}" placeholder="Edificio, bloque, etc. (opcional)">
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="city" class="form-label">Ciudad/Pueblo (Almería) *</label>
-                            <input type="text" class="form-control" id="city" name="city" value="{{ direccion.city|default:'' }}" list="almeria-towns" autocomplete="off" required>
-                            <datalist id="almeria-towns">
-                                {% for town in almeria_municipalities %}
-                                <option value="{{ town }}"></option>
-                                {% endfor %}
-                            </datalist>
-                            <div class="form-text">Selecciona o escribe un municipio de la provincia de Almería.</div>
-                            <div class="invalid-feedback" id="city-validation-message">
-                                El pueblo/ciudad debe pertenecer a la provincia de Almería.
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="postal_code" class="form-label">Código Postal *</label>
-                            <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ direccion.postal_code|default:'' }}" pattern="04[0-9]{3}" maxlength="5" placeholder="04XXX" required>
-                            <div class="form-text">Solo aceptamos códigos postales de Almería (04xxx).</div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="country" class="form-label">País *</label>
-                        <input type="text" class="form-control" id="country" name="country" value="España" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label for="phone" class="form-label">Teléfono *</label>
-                        <input type="tel" class="form-control" id="phone" name="phone" value="{{ direccion.phone|default:'' }}" placeholder="+34 600 000 000" required>
-                    </div>
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="is_default" name="is_default" {% if direccion.is_default %}checked{% endif %}>
-                        <label class="form-check-label" for="is_default">
-                            Establecer como dirección predeterminada
-                        </label>
-                    </div>
+                    {{ form.as_p }}
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">{% if direccion %}Actualizar{% else %}Crear{% endif %} Dirección</button>
                         <a href="{% url 'direcciones_usuario' %}" class="btn btn-secondary">Cancelar</a>
@@ -80,7 +35,6 @@
 <script>
     (function () {
         const cityInput = document.getElementById('city');
-        const cityValidationMessage = document.getElementById('city-validation-message');
         const form = cityInput ? cityInput.form : null;
 
         if (!cityInput || !form) {
@@ -123,8 +77,6 @@
                 cityInput.setCustomValidity('El pueblo/ciudad debe pertenecer a la provincia de Almería.');
                 cityInput.classList.add('is-invalid');
             }
-
-            cityValidationMessage.textContent = cityInput.validationMessage || 'El pueblo/ciudad debe pertenecer a la provincia de Almería.';
         }
 
         cityInput.addEventListener('input', validateTown);
