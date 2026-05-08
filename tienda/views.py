@@ -2336,7 +2336,7 @@ def add_review(request: HttpRequest, product_id: int):
 
     if not product.has_user_purchased(request.user):
         messages.error(request, "Solo puedes valorar productos que hayas comprado.")
-        return redirect(reverse("product_detail", args=[product_id]))
+        return redirect(reverse("producto", args=[product_id]))
 
     existing_review = Review.objects.filter(product=product, user=request.user).first()
 
@@ -2373,7 +2373,7 @@ def add_review(request: HttpRequest, product_id: int):
                 )
                 review.images.add(image)
 
-            return redirect(reverse("product_detail", args=[product_id]))
+            return redirect(reverse("producto", args=[product_id]))
     else:
         initial_data = {}
         if existing_review:
