@@ -3,9 +3,12 @@ from __future__ import annotations
 import unicodedata
 from django.db import models
 from django.contrib.auth.models import User, AbstractUser
+from django.core.validators import MaxValueValidator
 from django.utils.crypto import get_random_string
 from .vars import VAT_RATE, TRANSACTION_CODE_PREFIX, TRANSACTION_CODE_LENGTH, TRANSACTION_CODE_ALPHABET
 import random, string
+
+MAX_QUANTITY = 9999
 
 
 def generate_transaction_code() -> str:
@@ -154,10 +157,15 @@ class StockReservation(models.Model):
 class StockReservationItem(models.Model):
     reservation = models.ForeignKey(StockReservation, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="stock_reservation_items")
-    quantity = models.PositiveIntegerField(default=1)
+    quantity = models.PositiveIntegerField(default=1, validators=[MaxValueValidator(MAX_QUANTITY)])
 
     class Meta:
         unique_together = ("reservation", "product")
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.quantity is not None and self.quantity > MAX_QUANTITY:
+            raise ValidationError(f'La cantidad no puede exceder {MAX_QUANTITY} unidades.')
 
     def __str__(self):
         return f"{self.quantity}x {self.product.name} (reserva {self.reservation_id})"
@@ -190,7 +198,7 @@ class Cart(models.Model):
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField(default=1)
+    quantity = models.PositiveIntegerField(default=1, validators=[MaxValueValidator(MAX_QUANTITY)])
     added_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -265,7 +273,7 @@ class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True)
     product_name = models.CharField(max_length=200, default="")
     seller = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='order_items_to_fulfill')
-    quantity = models.PositiveIntegerField(default=1)
+    quantity = models.PositiveIntegerField(default=1, validators=[MaxValueValidator(MAX_QUANTITY)])
     unit_price = models.FloatField(default=0)
     total_price = models.FloatField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
