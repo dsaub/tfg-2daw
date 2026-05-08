@@ -128,7 +128,6 @@ class Product(models.Model):
             return False
         return OrderItem.objects.filter(
             order__buyer=user,
-            order__status=Order.STATUS_PAID,
             product=self
         ).exists()
 
