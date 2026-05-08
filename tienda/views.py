@@ -2231,19 +2231,6 @@ def mensajes_comprador(request: HttpRequest):
 
 
 
-def send_test_email(request: HttpRequest):
-    message = """
-
-Correo de prueba, deberias recibir esto bien
-y esto deberia tener un enter
-    """
-
-    result = send_email("danilacasito8@gmail.com", "Correo de Prueba", message)
-    if result[0]:
-        return HttpResponse("Mira tu bandeja")
-    else:
-        return HttpResponse(result[1])
-
 
 def verify(request: HttpRequest, code: str):
     obj = None
