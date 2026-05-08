@@ -12,33 +12,7 @@
         <form method="post" action="{% url 'register' %}">
           {% csrf_token %}
           
-          <div class="mb-3">
-            <label for="registerName" class="form-label">Nombre Completo</label>
-            <input type="text" class="form-control" id="registerName" name="name" required>
-          </div>
-          
-          <div class="mb-3">
-            <label for="registerEmail" class="form-label">Correo Electrónico</label>
-            <input type="email" class="form-control" id="registerEmail" name="email" required>
-          </div>
-          
-          <div class="mb-3">
-            <label for="registerPassword" class="form-label">Contraseña</label>
-            <input type="password" class="form-control" id="registerPassword" name="password" required>
-            <div class="form-text">La contraseña debe tener al menos 8 caracteres.</div>
-          </div>
-          
-          <div class="mb-3">
-            <label for="registerPasswordConfirm" class="form-label">Confirmar Contraseña</label>
-            <input type="password" class="form-control" id="registerPasswordConfirm" name="password_confirm" required>
-          </div>
-          
-          <div class="mb-3 form-check">
-            <input type="checkbox" class="form-check-input" id="acceptTerms" name="terms" required>
-            <label class="form-check-label" for="acceptTerms">
-              Acepto los <a href="{% url 'terminos' %}" target="_blank">términos y condiciones</a>
-            </label>
-          </div>
+          {{ form }}
           
           <div class="d-grid gap-2">
             <button type="submit" class="btn btn-primary">Crear Cuenta</button>

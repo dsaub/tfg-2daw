@@ -11,21 +11,19 @@ from .models import User, VerificationCode
 @shared_task
 def enviar_correo_bienvenida(email_usuario: str, nombre_usuario: str):
     html_content = render_to_string(
-        'emails/welcome.html',
+        'tienda/emails/welcome.html',
         {
             "name": nombre_usuario
         },
-        using='jinja2'
     )
     send_hemail(email_usuario, "Inicio de Sesión correcto", html_content, "Has iniciado sesión...")
 
 @shared_task
 def banear_usuario(email_usuario: str):
     html_content = render_to_string(
-        'emails/ban.html',
+        'tienda/emails/ban.html',
         {
         },
-        using='jinja2'
     )
 
     send_hemail(email_usuario, "Cuenta Bloqueada", html_content, "Tu cuenta ha sido bloqueada...")
@@ -33,9 +31,8 @@ def banear_usuario(email_usuario: str):
 @shared_task
 def desbanear_usuario(email_usuario: str):
     html_content = render_to_string(
-        'emails/unban.html',
+        'tienda/emails/unban.html',
         {},
-        using='jinja2'
     )
 
     send_hemail(email_usuario, "Cuenta Desbloqueada", html_content, "Tu cuenta ha sido desbloqueada...")
@@ -67,14 +64,13 @@ def enviar_correo_recuperacion(email: str):
         )
         ver_code.save()
         html_content = render_to_string(
-            'emails/reset_pass.html',
+            'tienda/emails/reset_pass.html',
             {
                 "name": usuario.get_full_name(),
                 "domain": settings.DOMAIN,
                 "protocol": settings.PROTOCOL,
                 "code": ver_code.code
             },
-            using='jinja2'
         )
 
         send_hemail(email, "Reset de Contraseña", html_content, "Estas reseteando la contraseña...")
