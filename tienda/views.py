@@ -1390,17 +1390,16 @@ def create_paypal_payment(request: HttpRequest):
             return JsonResponse({"error": "No se encontró la URL de aprobación"}, status=400)
         else:
             # Loguear el error
-            error_msg = str(payment.error) if hasattr(payment, 'error') else "Error desconocido"
-            logger.error("PAYPAL_CREATE_ERROR user_id=%s error=%s", request.user.id, error_msg)
-            return JsonResponse({"error": f"Error al crear el pago: {error_msg}"}, status=400)
+            logger.error("PAYPAL_CREATE_ERROR user_id=%s", request.user.id)
+            return JsonResponse({"error": f"Error al crear el pago"}, status=400)
 
     except ImportError:
         logger.error("PAYPAL_SDK_NOT_INSTALLED")
         return JsonResponse({"error": "SDK de PayPal no instalado"}, status=500)
     except Exception as e:
         error_msg = str(e)
-        logger.exception("PAYPAL_CREATE_EXCEPTION user_id=%s error=%s", request.user.id, error_msg)
-        return JsonResponse({"error": f"Error: {error_msg}"}, status=500)
+        logger.exception("PAYPAL_CREATE_EXCEPTION user_id=%s", request.user.id)
+        return JsonResponse({"error": f"Error al crear el pago"}, status=500)
 
 
 @login_required
