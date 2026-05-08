@@ -23,9 +23,9 @@
 
                         <div class="mb-4">
                             <label class="form-label">Puntuación</label>
-                            <div class="star-rating d-flex gap-2" id="star-rating">
+                            <div class="star-rating d-flex gap-1" id="star-rating">
                                 {% for i in "12345" %}
-                                <i class="bi bi-star fs-2 {% if form.initial.rating|default:0 >= i|add:0 %}text-warning{% else %}text-secondary{% endif %}" data-value="{{ i }}" style="cursor: pointer;"></i>
+                                <span class="star fs-2 {% if form.initial.rating|default:0 >= i|add:0 %}text-warning text-dark{% else %}text-secondary{% endif %}" data-value="{{ i }}" style="cursor: pointer; font-size: 2rem;">★</span>
                                 {% endfor %}
                             </div>
                             <input type="hidden" name="rating" id="rating-input" value="{{ form.initial.rating|default:1 }}">
@@ -50,12 +50,6 @@
                             {% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            <label for="images" class="form-label">Imágenes (opcional)</label>
-                            {{ form.images }}
-                            <div class="form-text">Puedes subir hasta 5 imágenes</div>
-                        </div>
-
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">
                                 {% if existing_review %}Actualizar{% else %}Enviar{% endif %} valoración
@@ -71,7 +65,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const stars = document.querySelectorAll('#star-rating i');
+    const stars = document.querySelectorAll('#star-rating .star');
     const ratingInput = document.getElementById('rating-input');
 
     function updateStars(value) {
@@ -104,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         star.addEventListener('mouseleave', function() {
-            updateStars(parseInt(ratingInput.value));
+            updateStars(parseInt(ratingInput.value) || 1);
         });
     });
 });
