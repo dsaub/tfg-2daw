@@ -370,3 +370,32 @@ class ResetPasswordPhase2Form(forms.Form):
         verify_password = cleaned_data.get("verify_password")
         if password and verify_password and password != verify_password:
             raise ValidationError("Las contraseñas no coinciden.")
+
+
+class ReviewForm(forms.Form):
+    rating = forms.IntegerField(
+        label="Puntuación",
+        required=True,
+        min_value=1,
+        max_value=5,
+        widget=forms.HiddenInput()
+    )
+    title = forms.CharField(
+        label="Título",
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Título de tu valoración'
+        })
+    )
+    content = forms.CharField(
+        label="Descripción",
+        max_length=2000,
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 5,
+            'placeholder': 'Comparte tu experiencia con este producto...'
+        })
+    )

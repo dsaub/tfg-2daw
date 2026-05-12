@@ -1,0 +1,106 @@
+{% extends "tienda/base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}">Inicio</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'producto' product.id %}">{{ product.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Valorar Producto</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">
+                        {% if existing_review %}Actualizar{% else %}Añadir{% endif %} valoración: {{ product.name }}
+                    </h4>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label class="form-label">Puntuación</label>
+                            <div class="star-rating d-flex gap-1" id="star-rating">
+                                {% for i in "12345" %}
+                                <span class="star fs-2 {% if form.initial.rating|default:0 >= i|add:0 %}text-warning text-dark{% else %}text-secondary{% endif %}" data-value="{{ i }}" style="cursor: pointer; font-size: 2rem;">★</span>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="rating" id="rating-input" value="{{ form.initial.rating|default:1 }}">
+                            {% if form.rating.errors %}
+                            <div class="text-danger small">{{ form.rating.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Título</label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                            <div class="text-danger small">{{ form.title.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="content" class="form-label">Descripción</label>
+                            {{ form.content }}
+                            {% if form.content.errors %}
+                            <div class="text-danger small">{{ form.content.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                {% if existing_review %}Actualizar{% else %}Enviar{% endif %} valoración
+                            </button>
+                            <a href="{% url 'producto' product.id %}" class="btn btn-outline-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stars = document.querySelectorAll('#star-rating .star');
+    const ratingInput = document.getElementById('rating-input');
+
+    function updateStars(value) {
+        stars.forEach((star, index) => {
+            if (index < value) {
+                star.classList.remove('text-secondary');
+                star.classList.add('text-warning');
+            } else {
+                star.classList.remove('text-warning');
+                star.classList.add('text-secondary');
+            }
+        });
+        ratingInput.value = value;
+    }
+
+    stars.forEach(star => {
+        star.addEventListener('click', function() {
+            const value = parseInt(this.dataset.value);
+            updateStars(value);
+        });
+
+        star.addEventListener('mouseenter', function() {
+            const value = parseInt(this.dataset.value);
+            stars.forEach((s, index) => {
+                if (index < value) {
+                    s.classList.remove('text-secondary');
+                    s.classList.add('text-warning');
+                }
+            });
+        });
+
+        star.addEventListener('mouseleave', function() {
+            updateStars(parseInt(ratingInput.value) || 1);
+        });
+    });
+});
+</script>
+{% endblock %}

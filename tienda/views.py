@@ -6,8 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
 from tienda.utilities import send_email
-from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode, SavedPaymentMethod
-from .forms import ProductForm, SecondaryImageForm, UserLoginForm, UserRegisterForm, ProductEditForm, EditProfileForm, ChangePasswordForm, ShippingAddressForm, ResetPasswordForm, ResetPasswordPhase2Form
+from .models import User, Product, Category, Cart, CartItem, Image, Order, OrderItem, OrderMessage, ShippingAddress, StockReservation, StockReservationItem, VerificationCode, SavedPaymentMethod, Review
+from .forms import ProductForm, SecondaryImageForm, UserLoginForm, UserRegisterForm, ProductEditForm, EditProfileForm, ChangePasswordForm, ShippingAddressForm, ResetPasswordForm, ResetPasswordPhase2Form, ReviewForm
 from . import tasks
 from .vars import (
     PAGE_SIZE,
@@ -400,7 +400,23 @@ def producto(request: HttpRequest, id: int):
         # Cachear el producto por 5 minutos (300 segundos)
         cache.set(cache_key, product, 300)
     
-    return render(request, "tienda/producto.html", {"product": product})
+    can_review = False
+    user_has_review = False
+    user_review_id = None
+    
+    if request.user.is_authenticated:
+        user_review = Review.objects.filter(product=product, user=request.user).first()
+        if user_review:
+            user_has_review = True
+            user_review_id = user_review.id
+        can_review = product.has_user_purchased(request.user) and not user_review
+    
+    return render(request, "tienda/producto.html", {
+        "product": product, 
+        "can_review": can_review,
+        "user_has_review": user_has_review,
+        "user_review_id": user_review_id
+    })
 
 def categoria(request: HttpRequest, id: int):
     page = 1
@@ -2324,3 +2340,97 @@ def reset_password_phase2(request: HttpRequest, code: str):
             return render(request, "tienda/reset_password_phase2.html", {"form": form, "code": code})
     else:
         raise Http404()
+
+
+@login_required
+def add_review(request: HttpRequest, product_id: int):
+    product = get_object_or_404(Product, id=product_id)
+
+    if not product.has_user_purchased(request.user):
+        messages.error(request, "Solo puedes valorar productos que hayas comprado.")
+        return redirect(reverse("producto", args=[product_id]))
+
+    existing_review = Review.objects.filter(product=product, user=request.user).first()
+
+    if request.method == "POST":
+        form = ReviewForm(request.POST, request.FILES)
+        if form.is_valid():
+            rating = form.cleaned_data["rating"]
+            title = form.cleaned_data["title"]
+            content = form.cleaned_data["content"]
+
+            if existing_review:
+                existing_review.rating = rating
+                existing_review.title = title
+                existing_review.content = content
+                existing_review.save()
+                existing_review.images.clear()
+                review = existing_review
+                messages.success(request, "¡Tu valoración ha sido actualizada!")
+            else:
+                review = Review.objects.create(
+                    product=product,
+                    user=request.user,
+                    rating=rating,
+                    title=title,
+                    content=content
+                )
+                messages.success(request, "¡Gracias por tu valoración!")
+
+            uploaded_files = request.FILES.getlist("images")
+            for uploaded_file in uploaded_files:
+                image = Image.objects.create(
+                    name=f"Review {product.name} - {request.user.username}",
+                    image=uploaded_file
+                )
+                review.images.add(image)
+
+            return redirect(reverse("producto", args=[product_id]))
+    else:
+        initial_data = {}
+        if existing_review:
+            initial_data = {
+                "rating": existing_review.rating,
+                "title": existing_review.title,
+                "content": existing_review.content
+            }
+        form = ReviewForm(initial=initial_data)
+
+    return render(request, "tienda/add_review.html", {
+        "product": product,
+        "form": form,
+        "existing_review": existing_review
+    })
+
+
+def product_reviews(request: HttpRequest, product_id: int):
+    product = get_object_or_404(Product, id=product_id)
+    reviews = product.reviews.select_related("user").prefetch_related("images").all()
+
+    return JsonResponse({
+        "reviews": [
+            {
+                "id": r.id,
+                "user": r.user.username,
+                "rating": r.rating,
+                "title": r.title,
+                "content": r.content,
+                "images": [img.to_dict() for img in r.images.all()],
+                "created_at": r.created_at.isoformat(),
+                "is_owner": request.user.is_authenticated and r.user.id == request.user.id
+            }
+            for r in reviews
+        ],
+        "average_rating": product.get_average_rating(),
+        "reviews_count": product.get_reviews_count(),
+        "can_review": request.user.is_authenticated and product.has_user_purchased(request.user) and not Review.objects.filter(product=product, user=request.user).exists()
+    })
+
+
+@login_required
+def delete_review(request: HttpRequest, review_id: int):
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    product_id = review.product_id
+    review.delete()
+    messages.success(request, "Tu valoración ha sido eliminada.")
+    return redirect(reverse("producto", args=[product_id]))

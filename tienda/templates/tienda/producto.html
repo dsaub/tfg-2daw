@@ -62,4 +62,101 @@
         {{ product.description }}
     </div>
 </div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h4 class="mb-3">Valoraciones</h4>
+        <div id="reviews-summary" class="mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="fs-4" id="average-rating">0.0</div>
+                <div>
+                    <div id="stars-display"></div>
+                    <small class="text-muted" id="reviews-count">0 valoraciones</small>
+                </div>
+                {% if can_review %}
+                <a href="{% url 'add_review' product.id %}" class="btn btn-sm btn-outline-primary ms-auto">Valorar este producto</a>
+                {% elif user_has_review %}
+                <div class="ms-auto">
+                    <a href="{% url 'add_review' product.id %}" class="btn btn-sm btn-outline-primary">Editar mi valoración</a>
+                    <form method="post" action="{% url 'delete_review' product.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta valoración?');">Eliminar</button>
+                    </form>
+                </div>
+                {% elif user.is_authenticated %}
+                <span class="text-muted ms-auto">Solo puedes valorar productos que hayas comprado</span>
+                {% else %}
+                <a href="{% url 'login' %}?next={% url 'producto' product.id %}" class="btn btn-sm btn-outline-primary ms-auto">Inicia sesión para valorar</a>
+                {% endif %}
+            </div>
+        </div>
+        <div id="reviews-list"></div>
+    </div>
+</div>
+
+<script>
+async function loadReviews() {
+    try {
+        const response = await fetch("{% url 'product_reviews' product.id %}");
+        const data = await response.json();
+        
+        document.getElementById('average-rating').textContent = data.average_rating;
+        document.getElementById('reviews-count').textContent = data.reviews_count + ' valoraciones';
+        
+        let starsHtml = '';
+        for (let i = 1; i <= 5; i++) {
+            starsHtml += `<span class="${i <= Math.round(data.average_rating) ? 'text-warning' : 'text-secondary'}">★</span>`;
+        }
+        document.getElementById('stars-display').innerHTML = starsHtml;
+        
+        const reviewsList = document.getElementById('reviews-list');
+        if (data.reviews.length === 0) {
+            reviewsList.innerHTML = '<p class="text-muted">Aún no hay valoraciones para este producto.</p>';
+        } else {
+            let reviewsHtml = '';
+            data.reviews.forEach(review => {
+                let imagesHtml = '';
+                if (review.images && review.images.length > 0) {
+                    imagesHtml = '<div class="mt-2">';
+                    review.images.forEach(img => {
+                        imagesHtml += `<img src="${img.image}" class="img-thumbnail me-1" style="max-width: 80px; max-height: 80px;" alt="">`;
+                    });
+                    imagesHtml += '</div>';
+                }
+                const actionsHtml = review.is_owner 
+                    ? `<div class="mt-2">
+                         <a href="/tienda/producto/${review.id}/valorar/" class="btn btn-sm btn-outline-primary me-1">Editar</a>
+                         <form method="post" action="/tienda/producto/${review.id}/valorar/eliminar/" style="display:inline;">
+                           {% csrf_token %}
+                           <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta valoración?');">Eliminar</button>
+                         </form>
+                       </div>`
+                    : '';
+                reviewsHtml += `
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>${review.user}</strong>
+                                    <span class="text-warning ms-1">${'★'.repeat(review.rating)}</span>
+                                </div>
+                                <small class="text-muted">${new Date(review.created_at).toLocaleDateString('es-ES')}</small>
+                            </div>
+                            <h6 class="mt-2">${review.title}</h6>
+                            <p class="mb-1">${review.content}</p>
+                            ${imagesHtml}
+                            ${actionsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            reviewsList.innerHTML = reviewsHtml;
+        }
+    } catch (error) {
+        console.error('Error loading reviews:', error);
+    }
+}
+
+loadReviews();
+</script>
 {% endblock %}
