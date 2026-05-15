@@ -318,3 +318,23 @@ p.price {
   overflow-wrap: break-word;
   word-wrap: break-word;
 }
+
+:root {
+  --chat--color--primary: #513CB0;
+  --chat--color--primary-shade-50: #3f2a8f;
+  --chat--color--primary--shade-100: #361DA7;
+  --chat--color--secondary: #513CB0;
+  --chat--color-secondary-shade-50: #3f2a8f;
+  --chat--color--typing: #513CB0;
+  --chat--color-dark: #101330;
+  --chat--window--border-radius: 12px;
+  --chat--toggle--background: #513CB0;
+  --chat--toggle--hover--background: #3f2a8f;
+  --chat--toggle--active--background: #361DA7;
+  --chat--message--bot--background: #f0f0f0;
+  --chat--message--user--background: #513CB0;
+  --chat--header--background: #513CB0;
+  --chat--input--send--button--color: #513CB0;
+  --chat--input--send--button--color-hover: #3f2a8f;
+  --chat--close--button--color-hover: #FC3F44;
+}

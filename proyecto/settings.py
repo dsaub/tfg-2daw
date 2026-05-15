@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.forms',
     'compressor',
+    'ninja',
 ]
 
 if S3_ENABLE:

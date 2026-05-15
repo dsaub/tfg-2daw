@@ -344,5 +344,27 @@
         });
     </script>
     {% endcache %}
+
+    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+    <script type="module">
+        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+        createChat({
+            webhookUrl: 'https://n8n.elordenador.org/webhook/0e2cbe42-39d2-4e86-be62-c12542e246d4/chat',
+            initialMessages: [
+                '¡Hola! 👋',
+                'Soy el asistente virtual de Comercialmeria. ¿En qué puedo ayudarte?'
+            ],
+            i18n: {
+                en: {
+                    title: 'Chat de Soporte',
+                    subtitle: 'Estamos aquí para ayudarte 24/7.',
+                    footer: '',
+                    getStarted: 'Nueva conversación',
+                    inputPlaceholder: 'Escribe tu mensaje...',
+                },
+            },
+        });
+    </script>
 </body>
 </html>

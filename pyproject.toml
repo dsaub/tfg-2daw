@@ -7,6 +7,7 @@ dependencies = [
     "celery==5.6.3",
     "Django==6.0.5",
     "django-compressor==4.6.0",
+    "django-ninja>=1.6.2",
     "django-redis==6.0.0",
     # S3 backend requerido por tienda/storage_backends.py cuando S3_ENABLE=True.
     "django-storages[s3]==1.14.6",
