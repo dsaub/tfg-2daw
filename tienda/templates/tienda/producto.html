@@ -94,7 +94,7 @@
     </div>
 </div>
 
-<script>
+<script type="module">
 async function loadReviews() {
     try {
         const response = await fetch("{% url 'product_reviews' product.id %}");
@@ -157,6 +157,6 @@ async function loadReviews() {
     }
 }
 
-loadReviews();
+await loadReviews();
 </script>
 {% endblock %}

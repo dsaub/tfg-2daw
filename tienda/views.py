@@ -711,7 +711,7 @@ def _validate_order_items(cart_items, product_map, locked_reservation, reserved_
     return None
 
 
-def _create_order_and_items(request, order_total, cart_items, items_with_totals, product_map, product_ids, payment_method, payment_reference, shipping_address, locked_reservation):
+def _create_order_and_items(request, order_total, items_with_totals, product_map, payment_method, payment_reference, shipping_address, locked_reservation):
     """Crea la orden y sus items, descuenta stock y marca reserva como completada."""
     order = Order.objects.create(
         buyer=request.user if request.user.is_authenticated else None,
@@ -778,7 +778,7 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
         if error_msg:
             return None, error_msg
 
-        order = _create_order_and_items(request, order_total, cart_items, items_with_totals, product_map, product_ids, payment_method, payment_reference, shipping_address, locked_reservation)
+        order = _create_order_and_items(request, order_total, items_with_totals, product_map, payment_method, payment_reference, shipping_address, locked_reservation)
 
         _invalidate_product_cache(product_ids)
         cart.items.all().delete()
@@ -1435,7 +1435,7 @@ def create_paypal_payment(request: HttpRequest):
         else:
             # Loguear el error
             logger.error("PAYPAL_CREATE_ERROR user_id=%s", request.user.id)
-            return JsonResponse({"error": f"Error al crear el pago"}, status=400)
+            return JsonResponse({"error": "Error al crear el pago"}, status=400)
 
     except ImportError:
         logger.error("PAYPAL_SDK_NOT_INSTALLED")
@@ -1443,7 +1443,7 @@ def create_paypal_payment(request: HttpRequest):
     except Exception as e:
         error_msg = str(e)
         logger.exception("PAYPAL_CREATE_EXCEPTION user_id=%s", request.user.id)
-        return JsonResponse({"error": f"Error al crear el pago"}, status=500)
+        return JsonResponse({"error": "Error al crear el pago"}, status=500)
 
 
 @require_GET
