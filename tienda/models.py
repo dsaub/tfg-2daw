@@ -6,7 +6,8 @@ from django.contrib.auth.models import User, AbstractUser
 from django.core.validators import MaxValueValidator
 from django.utils.crypto import get_random_string
 from .vars import VAT_RATE, TRANSACTION_CODE_PREFIX, TRANSACTION_CODE_LENGTH, TRANSACTION_CODE_ALPHABET
-import random, string
+import secrets
+import string
 
 MAX_QUANTITY = 9999
 
@@ -76,7 +77,7 @@ class VerificationCode(models.Model):
     @staticmethod
     def generate(user: User, code_mode: str) -> VerificationCode:
         while True:
-            code = "".join(random.choices(string.ascii_letters+string.digits, k=64))
+            code = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
             if not VerificationCode.objects.filter(code=code).exists():
                 return VerificationCode.objects.create(
                     code = code,
