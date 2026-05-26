@@ -43,14 +43,14 @@ STOCK_RESERVATION_SESSION_KEY = "stock_reservation_id"
 STOCK_RESERVATION_PAYMENT_SESSION_KEY = "stock_reservation_payment_method"
 
 # Constantes para plantillas y mensajes reutilizados
-LOGIN_TEMPLATE = LOGIN_TEMPLATE
-INDEX_TEMPLATE = INDEX_TEMPLATE
-EDITAR_PERFIL_TEMPLATE = EDITAR_PERFIL_TEMPLATE
-EDITAR_DIRECCION_TEMPLATE = EDITAR_DIRECCION_TEMPLATE
-MSG_CAMPOS_OBLIGATORIOS = MSG_CAMPOS_OBLIGATORIOS
-MSG_DIRECCION_INVALIDA = MSG_DIRECCION_INVALIDA
-MSG_CARRITO_VACIO = MSG_CARRITO_VACIO
-MSG_CUERPO_INVALIDO = MSG_CUERPO_INVALIDO
+LOGIN_TEMPLATE = "tienda/login.html"
+INDEX_TEMPLATE = "tienda/index.html"
+EDITAR_PERFIL_TEMPLATE = "tienda/editar_perfil.html"
+EDITAR_DIRECCION_TEMPLATE = "tienda/editar_direccion.html"
+MSG_CAMPOS_OBLIGATORIOS = "Por favor completa todos los campos obligatorios."
+MSG_DIRECCION_INVALIDA = "Debes seleccionar una dirección de envío válida."
+MSG_CARRITO_VACIO = "El carrito está vacío"
+MSG_CUERPO_INVALIDO = "Cuerpo de la petición inválido"
 
 
 def _mask_email(email: str) -> str:
