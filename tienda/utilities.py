@@ -33,7 +33,7 @@ def send_hemail(dest: str, title: str, body: str, nbody: str):
         )
 
         logger.info("EMAIL_SENT to=%s subject=%s", dest, title)
-        return (True,)
+        return (True, None)
     except Exception as e:
         logger.exception("EMAIL_SEND_FAILED to=%s subject=%s error=%s", dest, title, str(e))
         return (False, e)
