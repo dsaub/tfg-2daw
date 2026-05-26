@@ -86,12 +86,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     stars.forEach(star => {
         star.addEventListener('click', function() {
-            const value = parseInt(this.dataset.value);
+            const value = Number.parseInt(this.dataset.value);
             updateStars(value);
         });
 
         star.addEventListener('mouseenter', function() {
-            const value = parseInt(this.dataset.value);
+            const value = Number.parseInt(this.dataset.value);
             stars.forEach((s, index) => {
                 if (index < value) {
                     s.classList.remove('text-secondary');
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         star.addEventListener('mouseleave', function() {
-            updateStars(parseInt(ratingInput.value) || 1);
+            updateStars(Number.parseInt(ratingInput.value) || 1);
         });
     });
 });

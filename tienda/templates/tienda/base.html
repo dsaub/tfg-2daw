@@ -106,8 +106,8 @@
                 <!-- Barra de búsqueda con sugerencias -->
                 <form class="search-suggestions-container" method="GET" action="{% url 'search' %}" role="search" id="searchForm">
                     <div class="input-group">
-                        <input class="form-control" type="search" name="q" id="searchInput" placeholder="Buscar productos..." aria-label="Buscar" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="searchSuggestions" aria-activedescendant="" aria-haspopup="listbox">
-                        <button class="btn btn-outline-primary" type="submit" aria-label="Buscar productos">🔍 Buscar</button>
+                        <input class="form-control" type="search" name="q" id="searchInput" placeholder="Buscar productos..." aria-label="Buscar" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="searchSuggestions" aria-activedescendant="searchbutton" aria-haspopup="listbox">
+                        <button class="btn btn-outline-primary" type="submit" id="searchbutton" aria-label="Buscar productos">🔍 Buscar</button>
                     </div>
                     <div class="search-suggestions" id="searchSuggestions" role="listbox" aria-label="Sugerencias de búsqueda"></div>
                 </form>

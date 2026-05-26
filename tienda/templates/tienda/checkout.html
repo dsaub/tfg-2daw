@@ -84,11 +84,11 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr>
-                        <th>Producto</th>
-                        <th class="text-end">Precio (sin IVA)</th>
-                        <th class="text-end">Cantidad</th>
-                        <th class="text-end">Stock actual</th>
-                        <th class="text-end">Subtotal (con IVA)</th>
+                        <th scope="col">Producto</th>
+                        <th scope="col" class="text-end">Precio (sin IVA)</th>
+                        <th scope="col" class="text-end">Cantidad</th>
+                        <th scope="col" class="text-end">Stock actual</th>
+                        <th scope="col" class="text-end">Subtotal (con IVA)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -104,16 +104,16 @@
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="4" class="text-end">Subtotal:</th>
-                        <th class="text-end">{{ cart.get_total|format_price }}€</th>
+                        <th colspan="4" scope="row" class="text-end">Subtotal:</th>
+                        <td class="text-end">{{ cart.get_total|format_price }}€</th>
                     </tr>
                     <tr>
-                        <th colspan="4" class="text-end">IVA (21%):</th>
-                        <th class="text-end text-success">+{{ cart.get_vat_amount|format_price }}€</th>
+                        <th scope="row" colspan="4" class="text-end">IVA (21%):</th>
+                        <td class="text-end text-success">+{{ cart.get_vat_amount|format_price }}€</th>
                     </tr>
                     <tr style="background-color: #f8f9fa;">
-                        <th colspan="4" class="text-end" style="font-size: 1.1rem;">Total:</th>
-                        <th class="text-end" style="font-size: 1.1rem;">{{ cart.get_total_with_vat|format_price }}€</th>
+                        <th scope="row" colspan="4" class="text-end" style="font-size: 1.1rem;">Total:</th>
+                        <td class="text-end" style="font-size: 1.1rem;">{{ cart.get_total_with_vat|format_price }}€</th>
                     </tr>
                 </tfoot>
             </table>
@@ -125,7 +125,7 @@
                 <h5 class="card-title mb-3">2) Selecciona tu método de pago</h5>
 
                 <!-- Tabs -->
-                <ul class="nav nav-tabs mb-3" id="paymentTabs" role="tablist">
+                <ul class="nav nav-tabs mb-3" id="paymentTabs">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="tab-card" data-tab="pane-card" type="button"
                                 role="tab" aria-selected="true" aria-controls="pane-card" tabindex="0">
@@ -142,7 +142,7 @@
 
                 <!-- Tarjeta tab -->
                 <div id="pane-card" class="payment-tab-content active"
-                     role="tabpanel" aria-labelledby="tab-card" tabindex="0">
+                     role="tabpanel" aria-labelledby="tab-card">
                     {% if saved_cards %}
                     <fieldset class="mb-3">
                         <legend class="fw-semibold fs-6 mb-2">Selección de tarjeta</legend>
@@ -164,7 +164,7 @@
 
                     <div id="new-card-section" {% if saved_cards %}style="display:none;"{% endif %}>
                         <div class="mb-3">
-                            <label id="label-card-number" class="form-label">Número de tarjeta</label>
+                            <label id="label-card-number" class="form-label">Número de tarjeta <input type="hidden"></label>
                             <div id="card-element" aria-labelledby="label-card-number"></div>
                             <div id="card-errors" role="alert"></div>
                         </div>
@@ -187,7 +187,7 @@
 
                 <!-- PayPal tab -->
                 <div id="pane-paypal" class="payment-tab-content"
-                     role="tabpanel" aria-labelledby="tab-paypal" tabindex="0">
+                     role="tabpanel" aria-labelledby="tab-paypal">
                     {% if saved_paypal %}
                     <div class="alert alert-light border mb-3">
                         <small class="text-muted">Cuenta PayPal guardada:</small>
