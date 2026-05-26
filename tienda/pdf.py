@@ -17,15 +17,18 @@ class Recibo(FPDF):
 
 def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str, transaction_code: str):
     pdf = Recibo()
-    font_path = "/fonts/Roboto-Regular.ttf"
     pdf.add_font('Roboto', '', '/fonts/Roboto-Regular.ttf')
     pdf.add_font('Roboto', 'B', '/fonts/Roboto-Bold.ttf')
     pdf.add_page()
     pdf.set_font('Roboto', size=12)
 
+    METODOS_MAP = {"stripe": "Stripe", "paypal": "PayPal", "manual": "Manual"}
+    metodo_mostrar = METODOS_MAP.get(metodo_pago, metodo_pago)
+
     pdf.cell(0, 10, f"Cliente: {cliente}", ln=True)
     pdf.cell(0, 10, f"ID de transaccion: {transaction_code}", ln=True)
-    pdf.cell(0, 10, f"")
+    pdf.cell(0, 10, f"Metodo de pago: {metodo_mostrar}", ln=True)
+    pdf.cell(0, 10, "")
 
     DATA = []
     DATA.append(

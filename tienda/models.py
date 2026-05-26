@@ -48,6 +48,7 @@ class VerificationCode(models.Model):
         default = VerificationModes.VERIFY_ACCOUNT   
     )
     
+    @staticmethod
     def generate(user: User, code_mode: str) -> VerificationCode:
         while True:
             code = "".join(random.choices(string.ascii_letters+string.digits, k=64))
@@ -163,7 +164,7 @@ class StockReservation(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="stock_reservations")
-    session_key = models.CharField(max_length=40, null=True, blank=True)
+    session_key = models.CharField(max_length=40, default="", blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
     expires_at = models.DateTimeField(db_index=True)
@@ -193,7 +194,7 @@ class StockReservationItem(models.Model):
 
 class Cart(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-    session_key = models.CharField(max_length=40, null=True, blank=True)
+    session_key = models.CharField(max_length=40, default="", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -258,7 +259,7 @@ class Order(models.Model):
 
     buyer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     shipping_address = models.ForeignKey('ShippingAddress', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
-    session_key = models.CharField(max_length=40, null=True, blank=True)
+    session_key = models.CharField(max_length=40, default="", blank=True)
     total = models.FloatField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PAID)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default=PAYMENT_MANUAL)
