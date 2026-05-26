@@ -20,7 +20,6 @@ class UserAdmin(admin.ModelAdmin):
     def banear_usuario_action(self, request, queryset):
         usuarios_baneados = 0
         for user in queryset:
-            user: User = user
             # Desactiva usuario
             if user.registration_status == User.RegisterStatus.BANNED:
                 continue
@@ -43,7 +42,6 @@ class UserAdmin(admin.ModelAdmin):
     def desbanear_usuario_action(self, request, queryset):
         user_desbaneados = 0
         for user in queryset:
-            user: User = user
             if user.registration_status != User.RegisterStatus.BANNED:
                 continue
             
