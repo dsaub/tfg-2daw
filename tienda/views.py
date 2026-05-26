@@ -19,7 +19,7 @@ from .vars import (
 )
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.urls import reverse
 from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -204,6 +204,7 @@ def get_price_with_vat_decimal(price) -> Decimal:
         rounding=ROUND_HALF_UP,
     )
 
+@require_http_methods(["GET"])
 def home(request: HttpRequest):
     """Página de inicio del sitio"""
     categorias = Category.objects.all()
@@ -219,7 +220,7 @@ def home(request: HttpRequest):
         "total_sellers": total_sellers
     })
 
-
+@require_http_methods(["GET"])
 def index(request: HttpRequest):
     """Página de productos (lista paginada)"""
     page = 1
@@ -233,7 +234,7 @@ def index(request: HttpRequest):
     categorias = Category.objects.all()
     return render(request, "tienda/index.html", {"products": products, "categories": categorias})
 
-
+@require_http_methods(["GET", "POST"])
 def login(request: HttpRequest):
     if request.method == "POST":
         form: UserLoginForm = UserLoginForm(request.POST)
@@ -291,47 +292,7 @@ def login(request: HttpRequest):
         form = UserLoginForm()
     return render(request, "tienda/login.html", {"form": form})
 
-#        
-#        if user is not None:
-#            auth_login(request, user)
-#            
-#            # Configurar duración de sesión
-#            if not remember:
-#                request.session.set_expiry(0)
-#            else:
-#                request.session.set_expiry(1209600)  # 14 días en segundos
-#
-#            audit_logger.info(
-#                "LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s",
-#                user.id,
-#                user.email,
-#                client_ip,
-#                bool(remember),
-#            )
-#            tasks.enviar_correo_bienvenida.delay(user.email, "{} {}".format(user.first_name, user.last_name))
-#            # result = send_email(user.email, "Inicio de sesión correcto", login_message.format(name = "{} {}".format(user.first_name, user.last_name)))
-#            messages.success(request, f"¡Bienvenido {user.first_name or user.username}!")
-#            return redirect("index")
-#        else:
-#            user1: User = User.objects.get(username=username)
-#            if user1.registration_status == User.RegisterStatus.BANNED:
-#                    audit_logger.warning(
-#                        "LOGIN FAILED email=%s reason=user_banned ip=%s",
-#                        email,
-#                        client_ip,
-#                    )
-#                    messages.error(request, "Error, La cuenta esta bloqueada")
-#                    return render(request, "tienda/login.html")
-#            audit_logger.warning(
-#                "LOGIN_FAILED email=%s reason=invalid_credentials ip=%s",
-#                email,
-#                client_ip,
-#            )
-#            messages.error(request, "Correo electrónico o contraseña incorrectos.")
-#            return render(request, "tienda/login.html")
-#    
-#    return render(request, "tienda/login.html")
-
+@require_http_methods(["GET", "POST"])
 def register(request: HttpRequest):
     if request.method == "POST":
         form = UserRegisterForm(request.POST)
@@ -375,7 +336,7 @@ def register(request: HttpRequest):
         form = UserRegisterForm()
     return render(request, "tienda/register.html", {"form":form})
 
-
+@require_http_methods(["GET"])
 def logout(request: HttpRequest):
     user_id = request.user.id if request.user.is_authenticated else None
     email = request.user.email if request.user.is_authenticated else None
@@ -385,7 +346,7 @@ def logout(request: HttpRequest):
     messages.success(request, "Has cerrado sesión exitosamente.")
     return redirect("index")
 
-
+@require_http_methods(["GET"])
 def producto(request: HttpRequest, id: int):
     """Vista de detalle del producto con cacheo en Redis (5 minutos)"""
     cache_key = f'product_{id}'
@@ -418,6 +379,7 @@ def producto(request: HttpRequest, id: int):
         "user_review_id": user_review_id
     })
 
+@require_http_methods(["GET"])
 def categoria(request: HttpRequest, id: int):
     page = 1
     if "page" in request.GET:
@@ -432,6 +394,7 @@ def categoria(request: HttpRequest, id: int):
 
 
 # Funciones auxiliares para el carrito
+
 def get_or_create_cart(request):
     """Obtiene o crea un carrito para el usuario actual o sesión"""
     if request.user.is_authenticated:
@@ -647,7 +610,7 @@ def _get_selected_shipping_address(request: HttpRequest):
 
     return ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
 
-
+@require_GET
 def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None, stock_reservation=None):
     """Crea un pedido a partir del carrito actual, validando y descontando stock."""
     cart = get_or_create_cart(request)
@@ -837,7 +800,7 @@ def add_to_cart(request: HttpRequest, product_id: int):
         messages.error(request, "Producto no encontrado.")
         return redirect('index')
 
-
+@require_GET
 def view_cart(request: HttpRequest):
     """Muestra el contenido del carrito"""
     cart = get_or_create_cart(request)
@@ -850,7 +813,7 @@ def view_cart(request: HttpRequest):
         "stock_issues": stock_issues,
     })
 
-
+@require_POST
 def update_cart_item(request: HttpRequest, item_id: int):
     """Actualiza la cantidad de un item del carrito"""
     try:
@@ -887,7 +850,7 @@ def update_cart_item(request: HttpRequest, item_id: int):
         messages.error(request, "Cantidad no válida.")
         return redirect('view_cart')
 
-
+@require_POST
 def remove_from_cart(request: HttpRequest, item_id: int):
     """Elimina un producto del carrito"""
     try:
@@ -904,7 +867,7 @@ def remove_from_cart(request: HttpRequest, item_id: int):
     
     return redirect('view_cart')
 
-
+@require_POST
 def clear_cart(request: HttpRequest):
     """Vacía todo el carrito"""
     cart = get_or_create_cart(request)
@@ -914,7 +877,7 @@ def clear_cart(request: HttpRequest):
     messages.success(request, "Carrito vaciado.")
     return redirect('view_cart')
 
-
+@require_GET
 @login_required
 def mis_productos(request: HttpRequest):
     """Muestra los productos creados por el usuario autenticado"""
@@ -925,7 +888,7 @@ def mis_productos(request: HttpRequest):
         "total_productos": productos.count()
     })
 
-
+@require_GET
 @login_required
 def pedidos_vendedor(request: HttpRequest):
     """Muestra los pedidos asignados al vendedor autenticado"""
@@ -939,13 +902,10 @@ def pedidos_vendedor(request: HttpRequest):
         "total_pedidos": total_pedidos_por_enviar
     })
 
-
 @login_required
+@require_POST
 def cambiar_estado_pedido(request: HttpRequest, item_id: int):
     """Cambia el estado de un pedido asignado al vendedor"""
-    if request.method != "POST":
-        messages.error(request, "Acción no permitida.")
-        return redirect("pedidos_vendedor")
 
     order_item = get_object_or_404(OrderItem, id=item_id, seller=request.user)
     nuevo_estado = request.POST.get("estado")
@@ -959,13 +919,10 @@ def cambiar_estado_pedido(request: HttpRequest, item_id: int):
 
     return redirect("pedidos_vendedor")
 
-
 @login_required
+@require_POST
 def enviar_mensaje_pedido(request: HttpRequest, item_id: int):
     """Envía un mensaje al comprador sobre un pedido"""
-    if request.method != "POST":
-        messages.error(request, "Acción no permitida.")
-        return redirect("pedidos_vendedor")
 
     order_item = get_object_or_404(OrderItem, id=item_id, seller=request.user)
     mensaje = request.POST.get("mensaje", "").strip()
@@ -983,7 +940,7 @@ def enviar_mensaje_pedido(request: HttpRequest, item_id: int):
     messages.success(request, "Mensaje enviado correctamente.")
     return redirect("pedidos_vendedor")
 
-
+@require_http_methods(["GET","POST"])
 @login_required
 def crear_producto(request: HttpRequest):
     if request.method == "POST":
@@ -1013,6 +970,7 @@ def crear_producto(request: HttpRequest):
         form = ProductForm()
     return render(request, "tienda/crear_producto.html", {"form":form})
 
+@require_http_methods(["GET","POST"])
 @login_required
 def editar_producto(request: HttpRequest, id: int):
     """Edita un producto del usuario autenticado"""
@@ -1071,10 +1029,11 @@ def editar_producto(request: HttpRequest, id: int):
         "producto": producto
     })
 
-
 @login_required
+@require_http_methods(["GET", "POST"])
 def borrar_producto(request: HttpRequest, id: int):
     """Borra un producto del usuario autenticado"""
+
     if request.method != "POST":
         messages.error(request, "Acción no permitida.")
         return redirect("mis_productos")
@@ -1086,7 +1045,7 @@ def borrar_producto(request: HttpRequest, id: int):
     messages.success(request, f"Producto '{nombre}' eliminado correctamente.")
     return redirect("mis_productos")
 
-
+@require_http_methods(["GET","POST"])
 @login_required
 def gestionar_imagenes(request: HttpRequest, id: int):
     """Gestiona las imágenes secundarias de un producto"""
@@ -1114,13 +1073,10 @@ def gestionar_imagenes(request: HttpRequest, id: int):
         "form": form
     })
 
-
+@require_POST
 @login_required
 def eliminar_imagen_secundaria(request: HttpRequest, product_id: int, image_id: int):
     """Elimina una imagen secundaria de un producto"""
-    if request.method != "POST":
-        messages.error(request, "Acción no permitida.")
-        return redirect("gestionar_imagenes", id=product_id)
 
     producto = get_object_or_404(Product, id=product_id, creator=request.user)
     image = get_object_or_404(Image, id=image_id)
@@ -1135,6 +1091,7 @@ def eliminar_imagen_secundaria(request: HttpRequest, product_id: int, image_id: 
     messages.success(request, "Imagen eliminada correctamente.")
     return redirect("gestionar_imagenes", id=product_id)
 
+@require_GET
 @login_required
 def checkout(request: HttpRequest):
     cart = get_or_create_cart(request)
@@ -1156,20 +1113,19 @@ def checkout(request: HttpRequest):
         "paypal_client_id": settings.PAYPAL_CLIENT_ID,
     })
 
+@require_GET
 @csrf_exempt
 def stripe_config(request):
-    if request.method == "GET":
-        stripe_config = {
-            "publicKey": settings.STRIPE_PUBLISHABLE_KEY
-        }
-        return JsonResponse(stripe_config, safe=False)
+    stripe_config = {
+        "publicKey": settings.STRIPE_PUBLISHABLE_KEY
+    }
+    return JsonResponse(stripe_config, safe=False)
 
 
 @login_required
 @csrf_protect
+@require_POST
 def create_checkout_session(request: HttpRequest):
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
 
     try:
         shipping_address = _get_selected_shipping_address(request)
@@ -1239,7 +1195,7 @@ def create_checkout_session(request: HttpRequest):
         logger.exception("STRIPE_CHECKOUT_SESSION_ERROR user_id=%s error=%s", request.user.id, str(e))
         return JsonResponse({"error": "Error al crear la sesión de pago. Por favor inténtalo de nuevo."}, status=500)
 
-
+@require_GET
 @login_required
 def checkout_success(request: HttpRequest):
     payment_reference = request.session.get('stripe_session_id', "")
@@ -1266,7 +1222,7 @@ def checkout_success(request: HttpRequest):
     messages.success(request, "Pago realizado correctamente. ¡Gracias por tu compra!")
     return render(request, "tienda/checkout_success.html", {"order": order})
 
-
+@require_GET
 @login_required
 def checkout_cancel(request: HttpRequest):
     _cancel_active_stock_reservations_for_request(request)
@@ -1274,7 +1230,7 @@ def checkout_cancel(request: HttpRequest):
     messages.info(request, "Pago cancelado. Puedes intentarlo de nuevo cuando quieras.")
     return render(request, "tienda/checkout_cancel.html", {})
 
-
+@require_GET
 def search(request: HttpRequest):
     """Vista para buscar productos"""
     query = request.GET.get('q', '').strip()
@@ -1295,7 +1251,7 @@ def search(request: HttpRequest):
         "categories": categories
     })
 
-
+@require_GET
 def search_suggestions(request: HttpRequest):
     """API AJAX que retorna sugerencias de búsqueda en JSON"""
     query = request.GET.get('q', '').strip()
@@ -1318,13 +1274,11 @@ def search_suggestions(request: HttpRequest):
 
 
 
-
+@require_POST
 @login_required
 def create_paypal_payment(request: HttpRequest):
     """Crea un pago con PayPal y redirige a PayPal"""
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
-
+    
     try:
         shipping_address = _get_selected_shipping_address(request)
         if shipping_address is None:
@@ -1436,6 +1390,7 @@ def create_paypal_payment(request: HttpRequest):
         return JsonResponse({"error": f"Error al crear el pago"}, status=500)
 
 
+@require_GET
 @login_required
 def paypal_execute(request: HttpRequest):
     """Ejecuta el pago de PayPal después de la aprobación"""
@@ -1504,15 +1459,13 @@ def paypal_execute(request: HttpRequest):
 # ==================== STRIPE PAYMENT INTENTS ====================
 
 @login_required
+@require_POST
 @csrf_protect
 def crear_payment_intent(request: HttpRequest):
     """
     Crea un Stripe PaymentIntent para el carrito actual.
     Acepta JSON: { shipping_address_id, saved_payment_method_id (opcional), save_card (bool) }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
-
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -1588,15 +1541,13 @@ def crear_payment_intent(request: HttpRequest):
 
 
 @login_required
+@require_POST
 @csrf_protect
 def confirmar_pago_tarjeta(request: HttpRequest):
     """
     Verificar que el PaymentIntent fue exitoso y crear el pedido.
     Acepta JSON: { payment_intent_id, payment_method_id (si nueva tarjeta) }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
-
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -1663,14 +1614,13 @@ def confirmar_pago_tarjeta(request: HttpRequest):
 
 @login_required
 @csrf_protect
+@require_POST
 def crear_orden_paypal(request: HttpRequest):
     """
     Crea una orden de PayPal con el total del carrito actual (Orders API v2).
     Acepta JSON: { shipping_address_id }
     Retorna: { id: paypal_order_id }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
 
     shipping_address = _get_selected_shipping_address(request)
     if shipping_address is None:
@@ -1717,13 +1667,12 @@ def crear_orden_paypal(request: HttpRequest):
 
 @login_required
 @csrf_protect
+@require_POST
 def capturar_orden_paypal(request: HttpRequest):
     """
     Captura una orden de PayPal aprobada y crea el pedido en nuestra BD.
     Acepta JSON: { orderID }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
 
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -1806,7 +1755,7 @@ def capturar_orden_paypal(request: HttpRequest):
 
 
 # ==================== MÉTODOS DE PAGO DEL USUARIO ====================
-
+@require_GET
 @login_required
 def metodos_pago(request: HttpRequest):
     """Lista los métodos de pago guardados del usuario."""
@@ -1819,6 +1768,7 @@ def metodos_pago(request: HttpRequest):
 
 
 @login_required
+@require_GET
 def agregar_tarjeta(request: HttpRequest):
     """Página para añadir una nueva tarjeta usando Stripe SetupIntent."""
     return render(request, "tienda/agregar_tarjeta.html", {
@@ -1827,14 +1777,13 @@ def agregar_tarjeta(request: HttpRequest):
 
 
 @login_required
+@require_POST
 @csrf_protect
 def crear_setup_intent(request: HttpRequest):
     """
     Crea un Stripe SetupIntent y retorna el client_secret para que el frontend
     pueda montar el Card Element y confirmar sin realizar un cobro.
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
     try:
         stripe.api_key = settings.STRIPE_SECRET_KEY
         customer_id = _get_or_create_stripe_customer(request.user)
@@ -1853,13 +1802,12 @@ def crear_setup_intent(request: HttpRequest):
 
 @login_required
 @csrf_protect
+@require_POST
 def confirmar_setup_intent(request: HttpRequest):
     """
     Tras la confirmación del SetupIntent en el frontend, guarda la tarjeta.
     Acepta JSON: { payment_method_id, setup_intent_id }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
 
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -1924,10 +1872,11 @@ def confirmar_setup_intent(request: HttpRequest):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def eliminar_metodo_pago(request: HttpRequest, id: int):
     """Elimina un método de pago guardado del usuario."""
+
     if request.method != "POST":
-        messages.error(request, "Acción no permitida.")
         return redirect("metodos_pago")
 
     metodo = get_object_or_404(SavedPaymentMethod, id=id, user=request.user)
@@ -1946,6 +1895,7 @@ def eliminar_metodo_pago(request: HttpRequest, id: int):
 
 
 @login_required
+@require_GET
 def agregar_paypal(request: HttpRequest):
     """Página para guardar una cuenta de PayPal como método de pago (usa un pago de verificación de 0.01 €)."""
     return render(request, "tienda/agregar_paypal.html", {
@@ -1954,14 +1904,13 @@ def agregar_paypal(request: HttpRequest):
 
 
 @login_required
+@require_POST
 @csrf_protect
 def crear_orden_paypal_setup(request: HttpRequest):
     """
     Crea una orden PayPal de 0.01 € para verificar/guardar la cuenta.
     Retorna { id: paypal_order_id }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
     try:
         paypal_order = _paypal_create_order(Decimal("0.01"))
         return JsonResponse({"id": paypal_order.get("id")})
@@ -1972,13 +1921,12 @@ def crear_orden_paypal_setup(request: HttpRequest):
 
 @login_required
 @csrf_protect
+@require_POST
 def capturar_orden_paypal_setup(request: HttpRequest):
     """
     Captura la orden de verificación de PayPal y guarda la cuenta del usuario.
     Acepta JSON: { orderID }
     """
-    if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
 
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -2029,6 +1977,7 @@ def capturar_orden_paypal_setup(request: HttpRequest):
 # ==================== PORTAL DE USUARIO ====================
 
 @login_required
+@require_GET
 def portal_usuario(request: HttpRequest):
     """Dashboard del portal de usuario"""
     # Obtener estadísticas del usuario
@@ -2050,7 +1999,7 @@ def portal_usuario(request: HttpRequest):
         "recent_messages": recent_messages,
     })
 
-
+@require_GET
 @login_required
 def mis_compras(request: HttpRequest):
     """Lista completa de compras del usuario autenticado"""
@@ -2063,6 +2012,7 @@ def mis_compras(request: HttpRequest):
 
 
 @login_required
+@require_GET
 def mis_recibos(request: HttpRequest):
     """Lista de recibos (pedidos pagados) del usuario autenticado"""
     receipts = Order.objects.filter(
@@ -2077,6 +2027,7 @@ def mis_recibos(request: HttpRequest):
 
 
 @login_required
+@require_http_methods(["GET","POST"])
 def editar_perfil(request: HttpRequest):
     """Edita la información del perfil del usuario"""
     if request.method == "POST":
@@ -2107,6 +2058,7 @@ def editar_perfil(request: HttpRequest):
 
 
 @login_required
+@require_http_methods(["GET","POST"])
 def cambiar_contrasena(request: HttpRequest):
     """Cambia la contraseña del usuario"""
     if request.method == "POST":
@@ -2138,6 +2090,7 @@ def cambiar_contrasena(request: HttpRequest):
 
 
 @login_required
+@require_GET
 def direcciones_usuario(request: HttpRequest):
     """Lista las direcciones de entrega del usuario"""
     direcciones = ShippingAddress.objects.filter(user=request.user)
@@ -2148,6 +2101,7 @@ def direcciones_usuario(request: HttpRequest):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def crear_direccion(request: HttpRequest):
     """Crea una nueva dirección de entrega"""
     if request.method == "POST":
@@ -2187,6 +2141,7 @@ def crear_direccion(request: HttpRequest):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def editar_direccion(request: HttpRequest, id: int):
     """Edita una dirección de entrega existente"""
     direccion = get_object_or_404(ShippingAddress, id=id, user=request.user)
@@ -2236,6 +2191,7 @@ def editar_direccion(request: HttpRequest, id: int):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def eliminar_direccion(request: HttpRequest, id: int):
     """Elimina una dirección de entrega"""
     if request.method != "POST":
@@ -2249,6 +2205,7 @@ def eliminar_direccion(request: HttpRequest, id: int):
 
 
 @login_required
+@require_GET
 def mensajes_comprador(request: HttpRequest):
     """Muestra los mensajes recibidos de vendedores"""
     # Obtener todos los order items del comprador con mensajes
@@ -2265,6 +2222,7 @@ def mensajes_comprador(request: HttpRequest):
 
 
 
+@require_GET
 def verify(request: HttpRequest, code: str):
     obj = None
     try:
@@ -2282,27 +2240,35 @@ def verify(request: HttpRequest, code: str):
         return HttpResponse("<h1>Error</h1><p>No existe el codigo de verificación</p>")
 
 
+@require_GET
 def rgpd(request: HttpRequest):
     return render(request, "tienda/rgpd.html", {})
 
+@require_GET
 def devoluciones(request: HttpRequest):
     return render(request, "tienda/devoluciones.html", {})
 
+@require_GET
 def aviso_legal(request: HttpRequest):
     return render(request, "tienda/aviso_legal.html", {})
 
+@require_GET
 def terminos(request: HttpRequest):
     return render(request, "tienda/terminos.html", {})
 
+@require_GET
 def cookies(request: HttpRequest):
     return render(request, "tienda/cookies.html", {})
 
+@require_GET
 def sobre_nosotros(request: HttpRequest):
     return render(request, "tienda/sobre_nosotros.html", {})
 
+@require_GET
 def ayuda(request: HttpRequest):
     return render(request, "tienda/ayuda.html", {})
 
+@require_http_methods(["GET", "POST"])
 def reset_password(request: HttpRequest):
     if request.method == "GET":
         form = ResetPasswordForm()
@@ -2314,6 +2280,7 @@ def reset_password(request: HttpRequest):
             messages.info(request, "Si tienes una cuenta con ese correo electronico, se ha enviado un correo con un enlace")
         return render(request, "tienda/index.html", {})
     
+@require_http_methods(["GET", "POST"])
 def reset_password_phase2(request: HttpRequest, code: str):
     try:
         ver_code = VerificationCode.objects.get(code=code)
@@ -2343,6 +2310,7 @@ def reset_password_phase2(request: HttpRequest, code: str):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def add_review(request: HttpRequest, product_id: int):
     product = get_object_or_404(Product, id=product_id)
 
@@ -2403,6 +2371,7 @@ def add_review(request: HttpRequest, product_id: int):
     })
 
 
+@require_GET
 def product_reviews(request: HttpRequest, product_id: int):
     product = get_object_or_404(Product, id=product_id)
     reviews = product.reviews.select_related("user").prefetch_related("images").all()
@@ -2427,6 +2396,7 @@ def product_reviews(request: HttpRequest, product_id: int):
     })
 
 
+@require_POST
 @login_required
 def delete_review(request: HttpRequest, review_id: int):
     review = get_object_or_404(Review, id=review_id, user=request.user)

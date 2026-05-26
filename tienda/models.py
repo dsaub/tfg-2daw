@@ -11,6 +11,31 @@ import random, string
 MAX_QUANTITY = 9999
 
 
+class BlankToNoneCharField(models.CharField):
+    """Treat empty strings as None in Python, but store as empty strings in DB."""
+
+    def to_python(self, value):
+        value = super().to_python(value)
+        if value == "":
+            return None
+        return value
+
+    def from_db_value(self, value, expression, connection):
+        if value == "":
+            return None
+        return value
+
+    def get_prep_value(self, value):
+        if value is None or value == "":
+            return ""
+        return super().get_prep_value(value)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        path = "django.db.models.CharField"
+        return name, path, args, kwargs
+
+
 def generate_transaction_code() -> str:
     while True:
         code = f"{TRANSACTION_CODE_PREFIX}{get_random_string(TRANSACTION_CODE_LENGTH, TRANSACTION_CODE_ALPHABET)}"
@@ -194,9 +219,16 @@ class StockReservationItem(models.Model):
 
 class Cart(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-    session_key = models.CharField(max_length=40, default="", blank=True)
+    session_key = BlankToNoneCharField(max_length=40, default="", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.session_key is None:
+            self.session_key = ""
+        super().save(*args, **kwargs)
+        if self.session_key == "":
+            self.session_key = None
     
     def __str__(self):
         return f"Cart {self.id} - {self.user or self.session_key}"
