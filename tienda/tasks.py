@@ -4,7 +4,8 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 from .utilities import send_email, send_hemail
 from .vars import login_message, verify_message
-import random, string
+import secrets
+import string
 from . import pdf
 
 from .models import User, VerificationCode
@@ -43,7 +44,7 @@ def enviar_correo_confirmacion(id: int):
     code = VerificationCode.objects.create(
         user = usuario,
         code_mode = VerificationCode.VerificationModes.VERIFY_ACCOUNT,
-        code = ''.join(random.choices(string.digits, k=12))
+        code = ''.join(secrets.choice(string.digits) for _ in range(12))
     )
 
     message = verify_message.format(name = usuario.get_full_name(), protocol = settings.PROTOCOL, domain = settings.DOMAIN, code = code.code)
@@ -60,7 +61,7 @@ def enviar_correo_recuperacion(email: str):
         ver_code = VerificationCode.objects.create(
             code_mode = VerificationCode.VerificationModes.RESET_PASSWORD,
             user = usuario,
-            code = ''.join(random.choices(string.digits, k=12))
+            code = ''.join(secrets.choice(string.digits) for _ in range(12))
         )
         ver_code.save()
         html_content = render_to_string(

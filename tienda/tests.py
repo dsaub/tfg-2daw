@@ -16,6 +16,7 @@ from .models import (
 )
 from .forms import UserRegisterForm, UserLoginForm, EditProfileForm, ChangePasswordForm, ShippingAddressForm, ResetPasswordForm, ResetPasswordPhase2Form
 from .vars import VAT_RATE, TRANSACTION_CODE_PREFIX
+import secrets
 import string
 import random
 
@@ -335,7 +336,7 @@ class VerificationCodeModelTests(TestCase):
         """50 códigos pueden crearse sin conflictos."""
         codes = []
         for i in range(50):
-            mode = random.choice([
+            mode = secrets.choice([
                 VerificationCode.VerificationModes.VERIFY_ACCOUNT,
                 VerificationCode.VerificationModes.RESET_PASSWORD
             ])
@@ -377,7 +378,7 @@ class CategoryModelTests(TestCase):
         """100 categorías pueden crearse sin problemas."""
         categories = []
         for i in range(100):
-            cat = Category.objects.create(name=f"Category_{i}_{random.randint(1000, 9999)}")
+            cat = Category.objects.create(name=f"Category_{i}_{1000 + secrets.randbelow(9000)}")
             categories.append(cat)
         
         self.assertEqual(len(categories), 100)
