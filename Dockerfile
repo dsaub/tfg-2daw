@@ -4,18 +4,34 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
-COPY pyproject.toml uv.lock /app/ 
+COPY pyproject.toml uv.lock /app/
 
-RUN apk --no-cache update && apk --no-cache upgrade \
+RUN apk --no-cache update \
+&& apk --no-cache upgrade \
+&& apk --no-cache add \
+	build-base \
+	freetype-dev \
+	jpeg-dev \
+	zlib-dev \
 && pip install --no-cache-dir uv \
 && uv sync --no-dev --no-install-project # Install only dependencies, not the local project package
 
-COPY . /app/
+COPY ./entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
+
+COPY ./proyecto /app/proyecto
+COPY ./tienda /app/tienda
+COPY ./manage.py /app/manage.py
 
 
 EXPOSE 8000
 RUN mkdir -pv /fonts
 COPY tienda/static/fonts/ /fonts/
+
+RUN addgroup -S app \
+&& adduser -S app -G app \
+&& chown -R app:app /app /fonts
+
+USER app
 
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]

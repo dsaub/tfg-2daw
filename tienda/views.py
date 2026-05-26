@@ -1030,7 +1030,7 @@ def editar_producto(request: HttpRequest, id: int):
     })
 
 @login_required
-@require_http_methods(["GET", "POST"])
+@require_POST
 def borrar_producto(request: HttpRequest, id: int):
     """Borra un producto del usuario autenticado"""
 
@@ -2191,12 +2191,9 @@ def editar_direccion(request: HttpRequest, id: int):
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
+@require_POST
 def eliminar_direccion(request: HttpRequest, id: int):
     """Elimina una dirección de entrega"""
-    if request.method != "POST":
-        messages.error(request, "Acción no permitida.")
-        return redirect("direcciones_usuario")
     
     direccion = get_object_or_404(ShippingAddress, id=id, user=request.user)
     direccion.delete()

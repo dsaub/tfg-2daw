@@ -7,3 +7,13 @@ venv
 db.sqlite3
 static
 media
+docs
+logs
+staticfiles
+.gitignore
+AGENTS.md
+Dockerfile
+Makefile
+nginx.conf
+Procfile
+uv.lock

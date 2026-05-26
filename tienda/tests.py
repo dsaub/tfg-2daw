@@ -1786,7 +1786,7 @@ class EndpointViewTests(TestCase):
         self.assertTrue(OrderMessage.objects.filter(order_item=item, sender=self.seller).exists())
 
         delete_get = self.client.get(reverse("borrar_producto", args=[created.id]))
-        self.assertEqual(delete_get.status_code, 302)
+        self.assertEqual(delete_get.status_code, 405)
         delete_post = self.client.post(reverse("borrar_producto", args=[created.id]))
         self.assertEqual(delete_post.status_code, 302)
         self.assertFalse(Product.objects.filter(id=created.id).exists())
@@ -2068,7 +2068,7 @@ class EndpointViewTests(TestCase):
         self.assertEqual(new_address.full_name, "Comprador Dos Editado")
 
         delete_get = self.client.get(reverse("eliminar_direccion", args=[new_address.id]))
-        self.assertEqual(delete_get.status_code, 302)
+        self.assertEqual(delete_get.status_code, 405)
         delete_post = self.client.post(reverse("eliminar_direccion", args=[new_address.id]))
         self.assertEqual(delete_post.status_code, 302)
         self.assertFalse(ShippingAddress.objects.filter(id=new_address.id).exists())
