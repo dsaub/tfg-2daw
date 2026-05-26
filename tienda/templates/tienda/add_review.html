@@ -22,7 +22,7 @@
                         {% csrf_token %}
 
                         <div class="mb-4">
-                            <label class="form-label">Puntuación</label>
+                            <label for="rating-input" class="form-label">Puntuación</label>
                             <div class="star-rating d-flex gap-1" id="star-rating">
                                 {% for i in "12345" %}
                                 <span class="star fs-2 {% if form.initial.rating|default:0 >= i|add:0 %}text-warning text-dark{% else %}text-secondary{% endif %}" data-value="{{ i }}" style="cursor: pointer; font-size: 2rem;">★</span>
