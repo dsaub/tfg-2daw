@@ -28,7 +28,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: proyecto.settings
         run: |
-          uv run python manage.py test
+          SECRET_KEY=testkeynotuseinproducto uv run python manage.py test
 
   docker:
     runs-on: ubuntu-latest
