@@ -78,7 +78,7 @@
                 {% elif user_has_review %}
                 <div class="ms-auto">
                     <a href="{% url 'add_review' product.id %}" class="btn btn-sm btn-outline-primary">Editar mi valoración</a>
-                    <form method="post" action="{% url 'delete_review' product.id %}" style="display:inline;">
+                    <form method="post" action="{% url 'delete_review' user_review_id %}" style="display:inline;">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta valoración?');">Eliminar</button>
                     </form>

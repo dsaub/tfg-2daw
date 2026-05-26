@@ -70,6 +70,6 @@ urlpatterns = [
     path("reset-password", views.reset_password, name="reset_password"),
     path("reset-password-phase2/<str:code>", views.reset_password_phase2, name="reset_password_phase2"),
     path("producto/<int:product_id>/valorar/", views.add_review, name="add_review"),
-    path("producto/<int:product_id>/valorar/eliminar/", views.delete_review, name="delete_review"),
+    path("valoracion/<int:review_id>/eliminar/", views.delete_review, name="delete_review"),
     path("api/producto/<int:product_id>/valoraciones/", views.product_reviews, name="product_reviews"),
 ]
