@@ -42,6 +42,16 @@ audit_logger = logging.getLogger("tienda.audit")
 STOCK_RESERVATION_SESSION_KEY = "stock_reservation_id"
 STOCK_RESERVATION_PAYMENT_SESSION_KEY = "stock_reservation_payment_method"
 
+# Constantes para plantillas y mensajes reutilizados
+LOGIN_TEMPLATE = LOGIN_TEMPLATE
+INDEX_TEMPLATE = INDEX_TEMPLATE
+EDITAR_PERFIL_TEMPLATE = EDITAR_PERFIL_TEMPLATE
+EDITAR_DIRECCION_TEMPLATE = EDITAR_DIRECCION_TEMPLATE
+MSG_CAMPOS_OBLIGATORIOS = MSG_CAMPOS_OBLIGATORIOS
+MSG_DIRECCION_INVALIDA = MSG_DIRECCION_INVALIDA
+MSG_CARRITO_VACIO = MSG_CARRITO_VACIO
+MSG_CUERPO_INVALIDO = MSG_CUERPO_INVALIDO
+
 
 def _mask_email(email: str) -> str:
     if not email or '@' not in email:
@@ -232,65 +242,80 @@ def index(request: HttpRequest):
 
     products = Product.objects.all()[start:end]
     categorias = Category.objects.all()
-    return render(request, "tienda/index.html", {"products": products, "categories": categorias})
+    return render(request, INDEX_TEMPLATE, {"products": products, "categories": categorias})
+
+def _try_get_user(email: str):
+    """Intenta obtener un usuario por email, retorna (user, username) o (None, None)."""
+    try:
+        user = User.objects.get(email=email)
+        return user, user.username
+    except User.DoesNotExist:
+        return None, None
+
+
+def _handle_login_rate_limit(request, username, email):
+    """Verifica rate limit de intentos de login. Retorna True si está rate-limited."""
+    data = cache.get(f"tries_login_{username}")
+    logins = 0 if data is None else int(data)
+
+    if logins >= 5:
+        audit_logger.info("LOGIN FAILED email=%s reason=rate_limited", _mask_email(email))
+        messages.error(request, "Has sufrido de Rate Limit por fallar 5 veces la contraseña")
+        return True
+
+    logins += 1
+    cache.set(f"tries_login_{username}", str(logins), 600)
+    return False
+
 
 @require_http_methods(["GET", "POST"])
 def login(request: HttpRequest):
-    if request.method == "POST":
-        form: UserLoginForm = UserLoginForm(request.POST)
-        if form.is_valid():
-            email: str = form.cleaned_data["email"]
-            password: str = form.cleaned_data["password"]
-            remember: bool = form.cleaned_data["remember"]
-            client_ip = _get_client_ip(request)
-            try:
-                user: User = User.objects.get(email=email)
-                username = user.username
-            except User.DoesNotExist:
-                audit_logger.warning("LOGIN FAILED email=%s reason=user_not_found ip=%s", _mask_email(email), client_ip)
-                messages.error(request, "El email o la contraseña es incorrecta")
-                return render(request, "tienda/login.html", {"form": form})
-            if user.registration_status == User.RegisterStatus.BANNED:
-                # Usuario baneado.
-                messages.error(request, "Esta cuenta esta bloqueada.")
-                return render(request, "tienda/login.html", {"form": form})
-            
-            user = authenticate(request, username = username, password=password)
-            
-            if user is None:
-                data: str = cache.get(f"tries_login_{username}")
-                logins: int
-                if data is None:
-                    logins = 0
-                else:
-                    logins = int(data)
-                
-                if logins >= 5:
-                    audit_logger.info("LOGIN FAILED email=%s reason=rate_limited", _mask_email(email))
-                    messages.error(request, "Has sufrido de Rate Limit por fallar 5 veces la contraseña")
-                    return render(request, "tienda/login.html", {"form": form})
-                logins+=1
-                cache.set(f"tries_login_{username}", str(logins), 600)
-                messages.error(request, "El email o la contraseña es incorrecta")
-                return render(request, "tienda/login.html", {"form": form})
-            if user.registration_status == User.RegisterStatus.CONFIRMATION_REQUIRED:
-                audit_logger.info("LOGIN_FAILED email=%s reason=not_verified", _mask_email(email))
-                messages.error(request, "No se puede iniciar sesión porque no has verificado tu cuenta, comprueba tu email. Si eliminaste el email pero querias verificarte, contacta con el soporte tecnico")
-                return render(request, "tienda/login.html", {"form": form})
-            auth_login(request, user)
+    if request.method != "POST":
+        return render(request, LOGIN_TEMPLATE, {"form": UserLoginForm()})
 
-            if not remember:
-                request.session.set_expiry(0)
-            else:
-                request.session.set_expiry(1209600)
-            
-            audit_logger.info("LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s", user.id, _mask_email(user.email), client_ip, bool(remember))
-            tasks.enviar_correo_bienvenida.delay(user.email, f"{user.first_name} {user.last_name}")
-            messages.success(request, f"¡Bienvenido {user.first_name or user.username}!")
-            return redirect("index")
+    form = UserLoginForm(request.POST)
+    if not form.is_valid():
+        return render(request, LOGIN_TEMPLATE, {"form": form})
+
+    email = form.cleaned_data["email"]
+    password = form.cleaned_data["password"]
+    remember = form.cleaned_data["remember"]
+    client_ip = _get_client_ip(request)
+
+    user, username = _try_get_user(email)
+    if user is None:
+        audit_logger.warning("LOGIN FAILED email=%s reason=user_not_found ip=%s", _mask_email(email), client_ip)
+        messages.error(request, "El email o la contraseña es incorrecta")
+        return render(request, LOGIN_TEMPLATE, {"form": form})
+
+    if user.registration_status == User.RegisterStatus.BANNED:
+        messages.error(request, "Esta cuenta esta bloqueada.")
+        return render(request, LOGIN_TEMPLATE, {"form": form})
+
+    authenticated_user = authenticate(request, username=username, password=password)
+
+    if authenticated_user is None:
+        if _handle_login_rate_limit(request, username, email):
+            return render(request, LOGIN_TEMPLATE, {"form": form})
+        messages.error(request, "El email o la contraseña es incorrecta")
+        return render(request, LOGIN_TEMPLATE, {"form": form})
+
+    if authenticated_user.registration_status == User.RegisterStatus.CONFIRMATION_REQUIRED:
+        audit_logger.info("LOGIN_FAILED email=%s reason=not_verified", _mask_email(email))
+        messages.error(request, "No se puede iniciar sesión porque no has verificado tu cuenta, comprueba tu email. Si eliminaste el email pero querias verificarte, contacta con el soporte tecnico")
+        return render(request, LOGIN_TEMPLATE, {"form": form})
+
+    auth_login(request, authenticated_user)
+
+    if not remember:
+        request.session.set_expiry(0)
     else:
-        form = UserLoginForm()
-    return render(request, "tienda/login.html", {"form": form})
+        request.session.set_expiry(1209600)
+
+    audit_logger.info("LOGIN_SUCCESS user_id=%s email=%s ip=%s remember=%s", authenticated_user.id, _mask_email(authenticated_user.email), client_ip, bool(remember))
+    tasks.enviar_correo_bienvenida.delay(authenticated_user.email, f"{authenticated_user.first_name} {authenticated_user.last_name}")
+    messages.success(request, f"¡Bienvenido {authenticated_user.first_name or authenticated_user.username}!")
+    return redirect("index")
 
 @require_http_methods(["GET", "POST"])
 def register(request: HttpRequest):
@@ -390,7 +415,7 @@ def categoria(request: HttpRequest, id: int):
     category = Category.objects.get(id=id)
     categories = Category.objects.all()
     products = Product.objects.filter(category=category)[start:end]
-    return render(request, "tienda/index.html", {"products": products, "categories": categories})
+    return render(request, INDEX_TEMPLATE, {"products": products, "categories": categories})
 
 
 # Funciones auxiliares para el carrito
@@ -610,15 +635,9 @@ def _get_selected_shipping_address(request: HttpRequest):
 
     return ShippingAddress.objects.filter(id=shipping_address_id, user=request.user).first()
 
-@require_GET
-def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None, stock_reservation=None):
-    """Crea un pedido a partir del carrito actual, validando y descontando stock."""
-    cart = get_or_create_cart(request)
-    cart_items = list(cart.items.select_related("product", "product__creator"))
 
-    if not cart_items:
-        return None, "El carrito está vacío."
-
+def _calculate_order_totals(cart_items):
+    """Calcula los totales de los items del carrito."""
     order_total = Decimal("0.00")
     items_with_totals = []
     purchased_items = []
@@ -627,39 +646,124 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
         product = item.product
         unit_price_with_vat = get_price_with_vat_decimal(product.price)
         line_total_with_vat = (unit_price_with_vat * item.quantity).quantize(
-            Decimal("0.01"),
-            rounding=ROUND_HALF_UP,
+            Decimal("0.01"), rounding=ROUND_HALF_UP,
         )
         order_total += line_total_with_vat
         items_with_totals.append((item, unit_price_with_vat, line_total_with_vat))
-        purchased_items.append(
-            {
-                "amount": item.quantity,
-                "product_name": product.name,
-                "price": float(unit_price_with_vat),
-            }
-        )
+        purchased_items.append({
+            "amount": item.quantity,
+            "product_name": product.name,
+            "price": float(unit_price_with_vat),
+        })
 
+    return order_total, items_with_totals, purchased_items
+
+
+def _validate_locked_reservation(stock_reservation):
+    """Valida y carga la reserva de stock, retorna (locked_reservation, reserved_by_product).
+    Si stock_reservation es None, retorna (None, {}). Si la reserva ha caducado, retorna (None, None)."""
+    if stock_reservation is None:
+        return None, {}
+
+    locked_reservation = StockReservation.objects.select_for_update().filter(
+        id=stock_reservation.id,
+        status=StockReservation.STATUS_ACTIVE,
+        expires_at__gt=timezone.now(),
+    ).first()
+    if locked_reservation is None:
+        return None, None
+
+    reserved_by_product = {}
+    for reservation_item in locked_reservation.items.all():
+        reserved_by_product[reservation_item.product_id] = reservation_item.quantity
+
+    return locked_reservation, reserved_by_product
+
+
+def _validate_order_items(cart_items, product_map, locked_reservation, reserved_by_product, reserved_from_others):
+    """Valida disponibilidad y stock de cada item. Retorna None si ok, o str con el error."""
+    for item in cart_items:
+        product = product_map.get(item.product_id)
+        if product is None:
+            return f"El producto '{item.product.name}' ya no está disponible."
+
+        if locked_reservation is not None and item.quantity > reserved_by_product.get(item.product_id, 0):
+            return (
+                f"La cantidad de '{item.product.name}' ha cambiado desde la reserva. "
+                "Vuelve a intentar el pago."
+            )
+
+        available = max(product.stock - reserved_from_others.get(item.product_id, 0), 0)
+        if item.quantity > available:
+            return _build_stock_issue_message({
+                "product_name": item.product.name,
+                "requested": item.quantity,
+                "available": available,
+            })
+
+        if product.stock < item.quantity:
+            return _build_stock_issue_message({
+                "product_name": item.product.name,
+                "requested": item.quantity,
+                "available": product.stock,
+            })
+
+    return None
+
+
+def _create_order_and_items(request, order_total, cart_items, items_with_totals, product_map, product_ids, payment_method, payment_reference, shipping_address, locked_reservation):
+    """Crea la orden y sus items, descuenta stock y marca reserva como completada."""
+    order = Order.objects.create(
+        buyer=request.user if request.user.is_authenticated else None,
+        shipping_address=shipping_address,
+        session_key=None if request.user.is_authenticated else request.session.session_key,
+        total=float(order_total),
+        status=Order.STATUS_PAID,
+        payment_method=payment_method,
+        payment_reference=payment_reference or "",
+    )
+
+    for item, unit_price_with_vat, line_total_with_vat in items_with_totals:
+        product = item.product
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            product_name=product.name,
+            seller=product.creator,
+            quantity=item.quantity,
+            unit_price=float(unit_price_with_vat),
+            total_price=float(line_total_with_vat),
+        )
+        product_row = product_map.get(item.product_id)
+        product_row.stock = F('stock') - item.quantity
+        product_row.save(update_fields=["stock"])
+
+    if locked_reservation is not None:
+        locked_reservation.status = StockReservation.STATUS_COMPLETED
+        locked_reservation.save(update_fields=["status", "updated_at"])
+
+    return order
+
+
+@require_GET
+def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None, stock_reservation=None):
+    """Crea un pedido a partir del carrito actual, validando y descontando stock."""
+    cart = get_or_create_cart(request)
+    cart_items = list(cart.items.select_related("product", "product__creator"))
+
+    if not cart_items:
+        return None, MSG_CARRITO_VACIO + "."
+
+    order_total, items_with_totals, purchased_items = _calculate_order_totals(cart_items)
     _release_expired_stock_reservations()
 
     with transaction.atomic():
-        locked_reservation = None
-        reserved_by_product = {}
-
-        if stock_reservation is not None:
-            locked_reservation = StockReservation.objects.select_for_update().filter(
-                id=stock_reservation.id,
-                status=StockReservation.STATUS_ACTIVE,
-                expires_at__gt=timezone.now(),
-            ).first()
-            if locked_reservation is None:
-                return None, (
-                    f"La reserva de stock ha caducado. Tienes {STOCK_RESERVATION_MINUTES} minutos "
-                    "desde que pulsas pagar. Revisa el carrito y vuelve a intentarlo."
-                )
-
-            for reservation_item in locked_reservation.items.all():
-                reserved_by_product[reservation_item.product_id] = reservation_item.quantity
+        locked_reservation, reserved_by_product = _validate_locked_reservation(stock_reservation)
+        if locked_reservation is None and stock_reservation is not None:
+            return None, (
+                f"La reserva de stock ha caducado. Tienes {STOCK_RESERVATION_MINUTES} minutos "
+                "desde que pulsas pagar. Revisa el carrito y vuelve a intentarlo."
+            )
 
         product_ids = [item.product_id for item in cart_items]
         products = Product.objects.select_for_update().filter(id__in=product_ids)
@@ -670,65 +774,14 @@ def create_order_from_cart(request, payment_method, payment_reference="", shippi
             exclude_reservation_ids=[locked_reservation.id] if locked_reservation else None,
         )
 
-        for item in cart_items:
-            product = product_map.get(item.product_id)
-            if product is None:
-                return None, f"El producto '{item.product.name}' ya no está disponible."
+        error_msg = _validate_order_items(cart_items, product_map, locked_reservation, reserved_by_product, reserved_from_others)
+        if error_msg:
+            return None, error_msg
 
-            if locked_reservation is not None and item.quantity > reserved_by_product.get(item.product_id, 0):
-                return None, (
-                    f"La cantidad de '{item.product.name}' ha cambiado desde la reserva. "
-                    "Vuelve a intentar el pago."
-                )
-
-            available = max(product.stock - reserved_from_others.get(item.product_id, 0), 0)
-            if item.quantity > available:
-                return None, _build_stock_issue_message({
-                    "product_name": item.product.name,
-                    "requested": item.quantity,
-                    "available": available,
-                })
-
-            if product.stock < item.quantity:
-                return None, _build_stock_issue_message({
-                    "product_name": item.product.name,
-                    "requested": item.quantity,
-                    "available": product.stock,
-                })
-
-        order = Order.objects.create(
-            buyer=request.user if request.user.is_authenticated else None,
-            shipping_address=shipping_address,
-            session_key=None if request.user.is_authenticated else request.session.session_key,
-            total=float(order_total),
-            status=Order.STATUS_PAID,
-            payment_method=payment_method,
-            payment_reference=payment_reference or "",
-        )
-
-        for item, unit_price_with_vat, line_total_with_vat in items_with_totals:
-            product = item.product
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                product_name=product.name,
-                seller=product.creator,
-                quantity=item.quantity,
-                unit_price=float(unit_price_with_vat),
-                total_price=float(line_total_with_vat),
-            )
-
-            product_row = product_map.get(item.product_id)
-            product_row.stock = F('stock') - item.quantity
-            product_row.save(update_fields=["stock"])
+        order = _create_order_and_items(request, order_total, cart_items, items_with_totals, product_map, product_ids, payment_method, payment_reference, shipping_address, locked_reservation)
 
         _invalidate_product_cache(product_ids)
-
         cart.items.all().delete()
-
-        if locked_reservation is not None:
-            locked_reservation.status = StockReservation.STATUS_COMPLETED
-            locked_reservation.save(update_fields=["status", "updated_at"])
 
     if request.user.is_authenticated and purchased_items:
         tasks.process_purchase.delay(
@@ -970,6 +1023,41 @@ def crear_producto(request: HttpRequest):
         form = ProductForm()
     return render(request, "tienda/crear_producto.html", {"form":form})
 
+def _handle_edit_product_post(request, producto, form):
+    """Procesa el POST de editar producto. Retorna respuesta HTTP o None si hay error."""
+    producto.name = form.cleaned_data["name"]
+    producto.briefdesc = form.cleaned_data.get("briefdesc", "") or ""
+    producto.description = form.cleaned_data["description"]
+    producto.price = form.cleaned_data["price"]
+    producto.stock = form.cleaned_data["stock"]
+    producto.category = form.cleaned_data["category"]
+
+    primary_image_file = request.FILES.get("primary_image")
+    secondary_images_files = request.FILES.getlist("secondary_images")
+
+    if primary_image_file:
+        primary_image = Image.objects.create(
+            name=f"{producto.name}_principal",
+            image=primary_image_file
+        )
+        producto.primary_image = primary_image
+
+    producto.save()
+    _invalidate_product_cache([producto.id])
+
+    if secondary_images_files:
+        producto.secondary_images.clear()
+        for idx, img_file in enumerate(secondary_images_files):
+            secondary_img = Image.objects.create(
+                name=f"{producto.name}_secundaria_{idx+1}",
+                image=img_file
+            )
+            producto.secondary_images.add(secondary_img)
+
+    messages.success(request, f"¡Producto '{producto.name}' actualizado exitosamente!")
+    return redirect("mis_productos")
+
+
 @require_http_methods(["GET","POST"])
 @login_required
 def editar_producto(request: HttpRequest, id: int):
@@ -979,39 +1067,8 @@ def editar_producto(request: HttpRequest, id: int):
     if request.method == "POST":
         form = ProductEditForm(request.POST, request.FILES)
         if form.is_valid():
-            producto.name = form.cleaned_data["name"]
-            producto.briefdesc = form.cleaned_data.get("briefdesc", "") or ""
-            producto.description = form.cleaned_data["description"]
-            producto.price = form.cleaned_data["price"]
-            producto.stock = form.cleaned_data["stock"]
-            producto.category = form.cleaned_data["category"]
-
-            primary_image_file = request.FILES.get("primary_image")
-            secondary_images_files = request.FILES.getlist("secondary_images")
-
-            if primary_image_file:
-                primary_image = Image.objects.create(
-                    name=f"{producto.name}_principal",
-                    image=primary_image_file
-                )
-                producto.primary_image = primary_image
-
-            producto.save()
-            _invalidate_product_cache([producto.id])
-
-            if secondary_images_files:
-                producto.secondary_images.clear()
-                for idx, img_file in enumerate(secondary_images_files):
-                    secondary_img = Image.objects.create(
-                        name=f"{producto.name}_secundaria_{idx+1}",
-                        image=img_file
-                    )
-                    producto.secondary_images.add(secondary_img)
-
-            messages.success(request, f"¡Producto '{producto.name}' actualizado exitosamente!")
-            return redirect("mis_productos")
-        else:
-            messages.error(request, "Por favor completa todos los campos obligatorios.")
+            return _handle_edit_product_post(request, producto, form)
+        messages.error(request, MSG_CAMPOS_OBLIGATORIOS)
     else:
         initial = {
             "name": producto.name,
@@ -1023,10 +1080,9 @@ def editar_producto(request: HttpRequest, id: int):
         }
         form = ProductEditForm(initial=initial)
 
-    categories = Category.objects.all()
     return render(request, "tienda/editar_producto.html", {
         "form": form,
-        "producto": producto
+        "producto": producto,
     })
 
 @login_required
@@ -1130,13 +1186,13 @@ def create_checkout_session(request: HttpRequest):
     try:
         shipping_address = _get_selected_shipping_address(request)
         if shipping_address is None:
-            return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
+            return JsonResponse({"error": MSG_DIRECCION_INVALIDA}, status=400)
 
         cart = get_or_create_cart(request)
         cart_items = list(cart.items.select_related("product"))
 
         if not cart_items:
-            return JsonResponse({"error": "El carrito está vacío"}, status=400)
+            return JsonResponse({"error": MSG_CARRITO_VACIO}, status=400)
 
         active_reservation_ids = _get_active_reservation_ids_for_request(request)
         stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
@@ -1282,7 +1338,7 @@ def create_paypal_payment(request: HttpRequest):
     try:
         shipping_address = _get_selected_shipping_address(request)
         if shipping_address is None:
-            return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
+            return JsonResponse({"error": MSG_DIRECCION_INVALIDA}, status=400)
 
         import paypalrestsdk
         
@@ -1290,7 +1346,7 @@ def create_paypal_payment(request: HttpRequest):
         cart_items = list(cart.items.select_related("product"))
 
         if not cart_items:
-            return JsonResponse({"error": "El carrito está vacío"}, status=400)
+            return JsonResponse({"error": MSG_CARRITO_VACIO}, status=400)
 
         active_reservation_ids = _get_active_reservation_ids_for_request(request)
         stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
@@ -1469,17 +1525,17 @@ def crear_payment_intent(request: HttpRequest):
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+        return JsonResponse({"error": MSG_CUERPO_INVALIDO}, status=400)
 
     shipping_address = _get_selected_shipping_address(request)
     if shipping_address is None:
-        return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
+        return JsonResponse({"error": MSG_DIRECCION_INVALIDA}, status=400)
 
     cart = get_or_create_cart(request)
     cart_items = list(cart.items.select_related("product"))
 
     if not cart_items:
-        return JsonResponse({"error": "El carrito está vacío"}, status=400)
+        return JsonResponse({"error": MSG_CARRITO_VACIO}, status=400)
 
     active_reservation_ids = _get_active_reservation_ids_for_request(request)
     stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
@@ -1551,7 +1607,7 @@ def confirmar_pago_tarjeta(request: HttpRequest):
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+        return JsonResponse({"error": MSG_CUERPO_INVALIDO}, status=400)
 
     payment_intent_id = payload.get("payment_intent_id")
     if not payment_intent_id:
@@ -1624,13 +1680,13 @@ def crear_orden_paypal(request: HttpRequest):
 
     shipping_address = _get_selected_shipping_address(request)
     if shipping_address is None:
-        return JsonResponse({"error": "Debes seleccionar una dirección de envío válida."}, status=400)
+        return JsonResponse({"error": MSG_DIRECCION_INVALIDA}, status=400)
 
     cart = get_or_create_cart(request)
     cart_items = list(cart.items.select_related("product"))
 
     if not cart_items:
-        return JsonResponse({"error": "El carrito está vacío"}, status=400)
+        return JsonResponse({"error": MSG_CARRITO_VACIO}, status=400)
 
     active_reservation_ids = _get_active_reservation_ids_for_request(request)
     stock_issues = _get_cart_stock_issues(cart_items, exclude_reservation_ids=active_reservation_ids)
@@ -1677,7 +1733,7 @@ def capturar_orden_paypal(request: HttpRequest):
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+        return JsonResponse({"error": MSG_CUERPO_INVALIDO}, status=400)
 
     paypal_order_id = payload.get("orderID")
     if not paypal_order_id:
@@ -1812,7 +1868,7 @@ def confirmar_setup_intent(request: HttpRequest):
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+        return JsonResponse({"error": MSG_CUERPO_INVALIDO}, status=400)
 
     payment_method_id = payload.get("payment_method_id")
     if not payment_method_id:
@@ -1931,7 +1987,7 @@ def capturar_orden_paypal_setup(request: HttpRequest):
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "Cuerpo de la petición inválido"}, status=400)
+        return JsonResponse({"error": MSG_CUERPO_INVALIDO}, status=400)
 
     paypal_order_id = payload.get("orderID")
     if not paypal_order_id:
@@ -2037,7 +2093,7 @@ def editar_perfil(request: HttpRequest):
             
             if email != request.user.email and User.objects.filter(email=email).exists():
                 messages.error(request, "Ya existe un usuario con este correo electrónico.")
-                return render(request, "tienda/editar_perfil.html", {"form": form})
+                return render(request, EDITAR_PERFIL_TEMPLATE, {"form": form})
             
             request.user.first_name = form.cleaned_data["first_name"]
             request.user.last_name = form.cleaned_data["last_name"]
@@ -2054,7 +2110,7 @@ def editar_perfil(request: HttpRequest):
         }
         form = EditProfileForm(initial=initial)
     
-    return render(request, "tienda/editar_perfil.html", {"form": form})
+    return render(request, EDITAR_PERFIL_TEMPLATE, {"form": form})
 
 
 @login_required
@@ -2069,11 +2125,11 @@ def cambiar_contrasena(request: HttpRequest):
             
             if not request.user.check_password(current_password):
                 messages.error(request, "La contraseña actual es incorrecta.")
-                return render(request, "tienda/editar_perfil.html", {"password_form": ChangePasswordForm()})
+                return render(request, EDITAR_PERFIL_TEMPLATE, {"password_form": ChangePasswordForm()})
             
             if len(new_password) < 8:
                 messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
-                return render(request, "tienda/editar_perfil.html", {"password_form": ChangePasswordForm()})
+                return render(request, EDITAR_PERFIL_TEMPLATE, {"password_form": ChangePasswordForm()})
             
             request.user.set_password(new_password)
             request.user.save()
@@ -2084,7 +2140,7 @@ def cambiar_contrasena(request: HttpRequest):
             return redirect("portal_usuario")
         else:
             messages.error(request, "Las contraseñas nuevas no coinciden o son inválidas.")
-            return render(request, "tienda/editar_perfil.html", {"password_form": form})
+            return render(request, EDITAR_PERFIL_TEMPLATE, {"password_form": form})
     
     return redirect("editar_perfil")
 
@@ -2112,11 +2168,11 @@ def crear_direccion(request: HttpRequest):
             
             if not _is_almeria_city(city):
                 messages.error(request, "El pueblo/ciudad debe pertenecer a la provincia de Almería.")
-                return render(request, "tienda/editar_direccion.html", _address_form_context(form=form))
+                return render(request, EDITAR_DIRECCION_TEMPLATE, _address_form_context(form=form))
 
             if not _is_almeria_postal_code(postal_code):
                 messages.error(request, "Solo realizamos envíos en la provincia de Almería (código postal 04xxx).")
-                return render(request, "tienda/editar_direccion.html", _address_form_context(form=form))
+                return render(request, EDITAR_DIRECCION_TEMPLATE, _address_form_context(form=form))
             
             ShippingAddress.objects.create(
                 user=request.user,
@@ -2133,11 +2189,11 @@ def crear_direccion(request: HttpRequest):
             messages.success(request, "Dirección creada correctamente.")
             return redirect("direcciones_usuario")
         else:
-            messages.error(request, "Por favor completa todos los campos obligatorios.")
+            messages.error(request, MSG_CAMPOS_OBLIGATORIOS)
     else:
         form = ShippingAddressForm()
     
-    return render(request, "tienda/editar_direccion.html", _address_form_context(form=form))
+    return render(request, EDITAR_DIRECCION_TEMPLATE, _address_form_context(form=form))
 
 
 @login_required
@@ -2154,11 +2210,11 @@ def editar_direccion(request: HttpRequest, id: int):
             
             if not _is_almeria_city(city):
                 messages.error(request, "El pueblo/ciudad debe pertenece a la provincia de Almería.")
-                return render(request, "tienda/editar_direccion.html", _address_form_context(direccion, form=form))
+                return render(request, EDITAR_DIRECCION_TEMPLATE, _address_form_context(direccion, form=form))
 
             if not _is_almeria_postal_code(postal_code):
                 messages.error(request, "Solo realizamos envíos en la provincia de Almería (código postal 04xxx).")
-                return render(request, "tienda/editar_direccion.html", _address_form_context(direccion, form=form))
+                return render(request, EDITAR_DIRECCION_TEMPLATE, _address_form_context(direccion, form=form))
             
             direccion.full_name = form.cleaned_data["full_name"]
             direccion.address_line_1 = form.cleaned_data["address_line_1"]
@@ -2173,7 +2229,7 @@ def editar_direccion(request: HttpRequest, id: int):
             messages.success(request, "Dirección actualizada correctamente.")
             return redirect("direcciones_usuario")
         else:
-            messages.error(request, "Por favor completa todos los campos obligatorios.")
+            messages.error(request, MSG_CAMPOS_OBLIGATORIOS)
     else:
         initial = {
             "full_name": direccion.full_name,
@@ -2187,7 +2243,7 @@ def editar_direccion(request: HttpRequest, id: int):
         }
         form = ShippingAddressForm(initial=initial)
     
-    return render(request, "tienda/editar_direccion.html", _address_form_context(direccion, form=form))
+    return render(request, EDITAR_DIRECCION_TEMPLATE, _address_form_context(direccion, form=form))
 
 
 @login_required
@@ -2275,7 +2331,7 @@ def reset_password(request: HttpRequest):
         if form.is_valid():
             tasks.enviar_correo_recuperacion.delay(form.cleaned_data["email"])
             messages.info(request, "Si tienes una cuenta con ese correo electronico, se ha enviado un correo con un enlace")
-        return render(request, "tienda/index.html", {})
+        return render(request, INDEX_TEMPLATE, {})
     
 @require_http_methods(["GET", "POST"])
 def reset_password_phase2(request: HttpRequest, code: str):
