@@ -2,7 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MinLengthValidator, MaxLengthValidator
 from .models import Category
-from .constants import *
+from .constants import IMAGE_TYPE, EMAIL_FORMNAME, INCORRECT_PASSWORDS
 ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
