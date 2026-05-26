@@ -4,10 +4,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
-COPY pyproject.toml uv.lock /app/
-RUN apk --no-cache update && apk --no-cache upgrade
-RUN pip install --no-cache-dir uv
-RUN uv sync --no-dev --no-install-project # Install only dependencies, not the local project package
+COPY pyproject.toml uv.lock /app/ 
+
+RUN apk --no-cache update && apk --no-cache upgrade \
+&& pip install --no-cache-dir uv \
+&& uv sync --no-dev --no-install-project # Install only dependencies, not the local project package
 
 COPY . /app/
 RUN chmod +x /app/entrypoint.sh
