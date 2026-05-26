@@ -147,14 +147,14 @@ WSGI_APPLICATION = 'proyecto.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 # Usa PostgreSQL por defecto (POSTGRES_ENABLED=True); si no, SQLite.
 
-if RUNNING_TESTS:
+if RUNNING_TESTS or not env_bool('POSTGRES_ENABLED', True):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-elif env_bool('POSTGRES_ENABLED', True):
+else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -165,14 +165,6 @@ elif env_bool('POSTGRES_ENABLED', True):
             'PORT': env_int('POSTGRES_PORT', 5432),
         }
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
