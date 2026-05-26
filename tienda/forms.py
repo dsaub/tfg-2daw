@@ -2,9 +2,12 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MinLengthValidator, MaxLengthValidator
 from .models import Category
-
+from .constants import *
 ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+
+
 
 def validate_image_file(value):
     ext = value.name.split('.')[-1].lower()
@@ -76,7 +79,7 @@ class ProductForm(forms.Form):
         widget = forms.ClearableFileInput(
             attrs = {
                 'class': 'form-control',
-                'accept': 'image/*'
+                'accept': IMAGE_TYPE
             }
         )
     )
@@ -133,7 +136,7 @@ class SecondaryImageForm(forms.Form):
         widget = forms.ClearableFileInput(
             attrs = {
                 'class': 'form-control',
-                'accept': 'image/*'
+                'accept': IMAGE_TYPE
             }
         )
     )
@@ -192,7 +195,7 @@ class UserRegisterForm(forms.Form):
         )
     )
     email = forms.EmailField(
-        label = "Correo Electrónico",
+        label = EMAIL_FORMNAME,
         max_length = 255,
         required = True,
         widget = forms.TextInput(
@@ -236,7 +239,7 @@ class UserRegisterForm(forms.Form):
         password = cleaned_data.get("password")
         password_confirm = cleaned_data.get("password_confirm")
         if password and password_confirm and password != password_confirm:
-            raise ValidationError("Las contraseñas no coinciden.")
+            raise ValidationError(INCORRECT_PASSWORDS)
 
 
 class EditProfileForm(forms.Form):
@@ -253,7 +256,7 @@ class EditProfileForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
     email = forms.EmailField(
-        label="Correo Electrónico",
+        label=EMAIL_FORMNAME,
         max_length=254,
         required=True,
         widget=forms.EmailInput(attrs={'class': 'form-control'})
@@ -285,7 +288,7 @@ class ChangePasswordForm(forms.Form):
         new_password = cleaned_data.get("new_password")
         confirm_password = cleaned_data.get("confirm_password")
         if new_password and confirm_password and new_password != confirm_password:
-            raise ValidationError("Las contraseñas no coinciden.")
+            raise ValidationError(INCORRECT_PASSWORDS)
         if new_password and len(new_password) < 8:
             raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
 
@@ -343,7 +346,7 @@ class ShippingAddressForm(forms.Form):
 
 class ResetPasswordForm(forms.Form):
     email = forms.EmailField(
-        label="Correo Electrónico",
+        label=EMAIL_FORMNAME,
         max_length=254,
         required=True,
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'tu@email.com'})
@@ -369,7 +372,7 @@ class ResetPasswordPhase2Form(forms.Form):
         password = cleaned_data.get("password")
         verify_password = cleaned_data.get("verify_password")
         if password and verify_password and password != verify_password:
-            raise ValidationError("Las contraseñas no coinciden.")
+            raise ValidationError(INCORRECT_PASSWORDS)
 
 
 class ReviewForm(forms.Form):
