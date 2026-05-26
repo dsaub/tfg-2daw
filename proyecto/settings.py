@@ -86,7 +86,6 @@ S3_ENABLE = env_bool('S3_ENABLE', False)
 S3_USE_LOCAL_URLS = env_bool('S3_USE_LOCAL_URLS', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', [
-    '192.168.1.142',
     'localhost',
     '127.0.0.1',
 ])
