@@ -11,83 +11,47 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import logging
-import os, sys
+import os
+import sys
 from pathlib import Path
+
+import environ
+
 
 DEV_ENV = len(sys.argv) > 1 and sys.argv[1] == 'runserver'
 
 RUNNING_TESTS = any(arg in {'test', 'pytest'} for arg in sys.argv) or 'PYTEST_CURRENT_TEST' in os.environ
 
-
-def load_dotenv(dotenv_path: Path) -> None:
-    if not dotenv_path.exists():
-        return
-
-    for raw_line in dotenv_path.read_text(encoding='utf-8').splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith('#') or '=' not in line:
-            continue
-
-        key, value = line.split('=', 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
-
-
-def env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
-
-
-def env_list(name: str, default: list[str] | None = None) -> list[str]:
-    value = os.getenv(name)
-    if value is None:
-        return default or []
-    return [item.strip() for item in value.split(',') if item.strip()]
-
-
-def env_int(name: str, default: int) -> int:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return int(value)
-
-
-def env_str(name: str, default: str = '') -> str:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip()
-
-
-def env_optional_str(name: str) -> str | None:
-    value = os.getenv(name)
-    if value is None:
-        return None
-    value = value.strip()
-    return value or None
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / '.env')
+env = environ.Env(
+    DEBUG=(bool, True),
+    S3_ENABLE=(bool, False),
+    S3_USE_LOCAL_URLS=(bool, False),
+    POSTGRES_ENABLED=(bool, True),
+    POSTGRES_PORT=(int, 5432),
+    SMTP_PORT=(int, 587),
+    AWS_S3_USE_SSL=(bool, True),
+    AWS_QUERYSTRING_AUTH=(bool, False),
+)
+env.read_env(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', '')
+SECRET_KEY = env('SECRET_KEY', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DEBUG', True)
-S3_ENABLE = env_bool('S3_ENABLE', False)
-S3_USE_LOCAL_URLS = env_bool('S3_USE_LOCAL_URLS', False)
+DEBUG = env.bool('DEBUG')
+S3_ENABLE = env.bool('S3_ENABLE')
+S3_USE_LOCAL_URLS = env.bool('S3_USE_LOCAL_URLS')
 
-ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', [
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
     'localhost',
     '127.0.0.1',
+    'zkqpv8r3-8000.uks1.devtunnels.ms'
 ])
 
 
@@ -147,7 +111,7 @@ WSGI_APPLICATION = 'proyecto.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 # Usa PostgreSQL por defecto (POSTGRES_ENABLED=True); si no, SQLite.
 
-if RUNNING_TESTS or not env_bool('POSTGRES_ENABLED', True):
+if RUNNING_TESTS or not env.bool('POSTGRES_ENABLED'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -158,11 +122,11 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('POSTGRES_DB', 'tienda'),
-            'USER': os.getenv('POSTGRES_USER', 'postgres'),
-            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-            'HOST': os.getenv('POSTGRES_HOST', '127.0.0.1'),
-            'PORT': env_int('POSTGRES_PORT', 5432),
+            'NAME': env('POSTGRES_DB', default='tienda'),
+            'USER': env('POSTGRES_USER', default='postgres'),
+            'PASSWORD': env('POSTGRES_PASSWORD', default=''),
+            'HOST': env('POSTGRES_HOST', default='127.0.0.1'),
+            'PORT': env.int('POSTGRES_PORT'),
         }
     }
 
@@ -222,15 +186,15 @@ STORAGES = {
 }
 
 if S3_ENABLE:
-    AWS_STORAGE_BUCKET_NAME = env_str('AWS_STORAGE_BUCKET_NAME') or None
-    AWS_ACCESS_KEY_ID = env_optional_str('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = env_optional_str('AWS_SECRET_ACCESS_KEY')
-    AWS_S3_REGION_NAME = env_optional_str('AWS_S3_REGION_NAME')
-    AWS_S3_ENDPOINT_URL = env_optional_str('AWS_S3_ENDPOINT_URL')
-    AWS_S3_CUSTOM_DOMAIN = env_optional_str('AWS_S3_CUSTOM_DOMAIN')
-    AWS_S3_USE_SSL = env_bool('AWS_S3_USE_SSL', True)
-    AWS_QUERYSTRING_AUTH = env_bool('AWS_QUERYSTRING_AUTH', False)
-    AWS_DEFAULT_ACL = env_str('AWS_DEFAULT_ACL', 'public-read') or None
+    AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default='') or None
+    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
+    AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default=None)
+    AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME', default=None)
+    AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL', default=None)
+    AWS_S3_CUSTOM_DOMAIN = env('AWS_S3_CUSTOM_DOMAIN', default=None)
+    AWS_S3_USE_SSL = env.bool('AWS_S3_USE_SSL')
+    AWS_QUERYSTRING_AUTH = env.bool('AWS_QUERYSTRING_AUTH')
+    AWS_DEFAULT_ACL = env('AWS_DEFAULT_ACL', default='public-read') or None
     AWS_S3_OBJECT_PARAMETERS = {}
 
     STORAGES = {
@@ -252,13 +216,13 @@ COMPRESS_PRECOMPILERS = ()
 
 # Media files (User uploads)
 MEDIA_URL = 'media/'
-MEDIA_ROOT = Path(os.getenv('MEDIA_ROOT', '/app/media'))
+MEDIA_ROOT = Path(env('MEDIA_ROOT', default='/app/media'))
 
 # Redis Configuration
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+        'LOCATION': env('REDIS_URL', default='redis://127.0.0.1:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         }
@@ -283,30 +247,30 @@ MESSAGE_TAGS = {
 # Login URL
 LOGIN_URL = '/tienda/login/'
 
-STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
 # PayPal Configuration (Sandbox)
 # Para obtener credenciales: https://sandbox.paypal.com/
-PAYPAL_CLIENT_ID = os.getenv('PAYPAL_CLIENT_ID', '')  # Reemplazar con tu Client ID de PayPal Sandbox
-PAYPAL_CLIENT_SECRET = os.getenv('PAYPAL_CLIENT_SECRET', '')  # Reemplazar con tu Client Secret de PayPal Sandbox
-PAYPAL_MODE = os.getenv('PAYPAL_MODE', 'sandbox')  # Cambiar a 'live' en producción
+PAYPAL_CLIENT_ID = env('PAYPAL_CLIENT_ID', default='')  # Reemplazar con tu Client ID de PayPal Sandbox
+PAYPAL_CLIENT_SECRET = env('PAYPAL_CLIENT_SECRET', default='')  # Reemplazar con tu Client Secret de PayPal Sandbox
+PAYPAL_MODE = env('PAYPAL_MODE', default='sandbox')  # Cambiar a 'live' en producción
 
 
-SMTP_ENDPOINT = os.getenv('SMTP_ENDPOINT', 'smtp.email.eu-paris-1.oci.oraclecloud.com')
-SMTP_PORT = env_int('SMTP_PORT', 587)
-SECURITY = os.getenv('SECURITY', 'tls')
-SMTP_USERNAME = os.getenv('SMTP_USERNAME', None)
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', None)
-SMTP_EMAIL = os.getenv("SMTP_EMAIL", None)
+SMTP_ENDPOINT = env('SMTP_ENDPOINT', default='smtp.email.eu-paris-1.oci.oraclecloud.com')
+SMTP_PORT = env.int('SMTP_PORT')
+SECURITY = env('SECURITY', default='tls')
+SMTP_USERNAME = env('SMTP_USERNAME', default=None)
+SMTP_PASSWORD = env('SMTP_PASSWORD', default=None)
+SMTP_EMAIL = env('SMTP_EMAIL', default=None)
 
 
 
 AUTH_USER_MODEL = 'tienda.User'
 
 
-DOMAIN = os.getenv("DOMAIN", "localhost")
-PROTOCOL = os.getenv("PROTOCOL", "http")
+DOMAIN = env('DOMAIN', default='localhost')
+PROTOCOL = env('PROTOCOL', default='http')
 
 default_csrf_trusted_origins = []
 if DOMAIN:
@@ -316,16 +280,16 @@ for host in ALLOWED_HOSTS:
     if host and host != '*':
         default_csrf_trusted_origins.append(f"{PROTOCOL}://{host}")
 
-CSRF_TRUSTED_ORIGINS = env_list(
+CSRF_TRUSTED_ORIGINS = env.list(
     'CSRF_TRUSTED_ORIGINS',
-    list(dict.fromkeys(default_csrf_trusted_origins)),
+    default=list(dict.fromkeys(default_csrf_trusted_origins)),
 )
 
 
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
-LOG_DIR = Path(os.getenv('LOG_DIR', BASE_DIR / 'logs'))
+LOG_LEVEL = env('LOG_LEVEL', default='INFO').upper()
+LOG_DIR = Path(env('LOG_DIR', default=str(BASE_DIR / 'logs')))
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOG_DIR / os.getenv('LOG_FILE', 'app.log')
+LOG_FILE = LOG_DIR / env('LOG_FILE', default='app.log')
 
 
 LOGGING = {
@@ -399,13 +363,13 @@ EMAIL_HOST_USER = SMTP_USERNAME
 EMAIL_HOST_PASSWORD = SMTP_PASSWORD
 
 # El correo que se usará como remitente por defecto
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL") or SMTP_EMAIL or "no-reply@localhost"
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='') or SMTP_EMAIL or 'no-reply@localhost'
 
 # URL de Redis (asumiendo que corre en el puerto default 6379)
-CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 
 # Opcional: para guardar el resultado de las tareas
-CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
 
 # Configuraciones adicionales recomendadas
 CELERY_ACCEPT_CONTENT = ['json']
