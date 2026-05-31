@@ -164,10 +164,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 COMPRESS_ROOT = STATIC_ROOT
-COMPRESS_URL = STATIC_URL
+
 STATICFILES_DIRS = [
     BASE_DIR / 'tienda' / 'static',
 ]
@@ -206,6 +206,14 @@ if S3_ENABLE:
         },
     }
 
+if S3_ENABLE and AWS_S3_CUSTOM_DOMAIN:
+    STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
+else:
+    STATIC_URL = env("STATIC_URL", default="static/")
+    MEDIA_URL = env("MEDIA_URL", default="media/")
+
+COMPRESS_URL = STATIC_URL
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
@@ -214,8 +222,6 @@ STATICFILES_FINDERS = [
 
 COMPRESS_PRECOMPILERS = ()
 
-# Media files (User uploads)
-MEDIA_URL = 'media/'
 MEDIA_ROOT = Path(env('MEDIA_ROOT', default='/app/media'))
 
 # Redis Configuration
