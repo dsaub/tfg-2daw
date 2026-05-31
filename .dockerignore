@@ -16,4 +16,3 @@ Dockerfile
 Makefile
 nginx.conf
 Procfile
-uv.lock
