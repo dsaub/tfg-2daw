@@ -718,15 +718,22 @@ def _validate_order_items(cart_items, product_map, locked_reservation, reserved_
 
 def _create_order_and_items(request, order_total, items_with_totals, product_map, payment_method, payment_reference, shipping_address, locked_reservation):
     """Crea la orden y sus items, descuenta stock y marca reserva como completada."""
-    order = Order.objects.create(
-        buyer=request.user if request.user.is_authenticated else None,
-        shipping_address=shipping_address,
-        session_key=None if request.user.is_authenticated else request.session.session_key,
-        total=float(order_total),
-        status=Order.STATUS_PAID,
-        payment_method=payment_method,
-        payment_reference=payment_reference or "",
-    )
+    order_kwargs = {
+        "buyer": request.user if request.user.is_authenticated else None,
+        "shipping_address": shipping_address,
+        "total": float(order_total),
+        "status": Order.STATUS_PAID,
+        "payment_method": payment_method,
+        "payment_reference": payment_reference or "",
+    }
+    if request.user.is_authenticated:
+        order_kwargs["session_key"] = ""
+    else:
+        if not request.session.session_key:
+            request.session.create()
+        order_kwargs["session_key"] = request.session.session_key
+
+    order = Order.objects.create(**order_kwargs)
 
     for item, unit_price_with_vat, line_total_with_vat in items_with_totals:
         product = item.product
@@ -750,7 +757,6 @@ def _create_order_and_items(request, order_total, items_with_totals, product_map
     return order
 
 
-@require_GET
 def create_order_from_cart(request, payment_method, payment_reference="", shipping_address=None, stock_reservation=None):
     """Crea un pedido a partir del carrito actual, validando y descontando stock."""
     cart = get_or_create_cart(request)
