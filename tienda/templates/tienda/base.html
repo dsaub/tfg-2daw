@@ -344,7 +344,7 @@
     <script type="module">
         import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
         fetch("https://n8n.elordenador.org/webhook/chatbot-endpoint").then((data) => {
-            return response.json();
+            return data.json();
         }).then((json) => {
             createChat({
             webhookUrl: json.url,
