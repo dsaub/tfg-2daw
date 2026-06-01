@@ -7,11 +7,11 @@
         <div id="carouselProducto" class="carousel slide">
             <div class="carousel-inner">
                 <div class="carousel-item active">
-                    <img src="{{ product.primary_image.url }}" class="d-block w-100" alt="{{ product.primary_image.alt|default:product.name }}">
+                    <img src="{{ product.primary_image.image.url }}" class="d-block w-100" alt="{{ product.primary_image.alt|default:product.name }}">
                 </div>
                 {% for image in product.secondary_images.all %}
                     <div class="carousel-item">
-                        <img src="{{ image.url }}" class="d-block w-100" alt="{{ image.alt|default:product.name }}">
+                        <img src="{{ image.image.url }}" class="d-block w-100" alt="{{ image.alt|default:product.name }}">
                     </div>
                 {% endfor %}
             </div>
