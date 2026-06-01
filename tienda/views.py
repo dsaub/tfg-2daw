@@ -579,12 +579,17 @@ def _create_stock_reservation_for_cart(request: HttpRequest, cart_items, payment
         if issues:
             return None, issues
 
-        reservation = StockReservation.objects.create(
-            user=request.user if request.user.is_authenticated else None,
-            session_key=None if request.user.is_authenticated else _get_or_create_session_key(request),
-            payment_method=payment_method,
-            expires_at=timezone.now() + timedelta(minutes=STOCK_RESERVATION_MINUTES),
-        )
+        reservation_kwargs = {
+            "user": request.user if request.user.is_authenticated else None,
+            "payment_method": payment_method,
+            "expires_at": timezone.now() + timedelta(minutes=STOCK_RESERVATION_MINUTES),
+        }
+        if request.user.is_authenticated:
+            reservation_kwargs["session_key"] = ""
+        else:
+            reservation_kwargs["session_key"] = _get_or_create_session_key(request)
+
+        reservation = StockReservation.objects.create(**reservation_kwargs)
         StockReservationItem.objects.bulk_create([
             StockReservationItem(
                 reservation=reservation,
