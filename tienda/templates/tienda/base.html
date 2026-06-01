@@ -343,9 +343,11 @@
     <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
     <script type="module">
         import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-
-        createChat({
-            webhookUrl: 'https://n8n.elordenador.org/webhook/e9363447-c127-499e-a76b-082651451cbe/chat',
+        fetch("https://n8n.elordenador.org/webhook/chatbot-endpoint").then((data) => {
+            return response.json();
+        }).then((json) => {
+            createChat({
+            webhookUrl: json.url,
             initialMessages: [
                 '¡Hola! 👋',
                 'Soy el asistente virtual de Comercialmeria. ¿En qué puedo ayudarte?'
@@ -360,6 +362,8 @@
                 },
             },
         });
+        })
+        
     </script>
 </body>
 </html>
