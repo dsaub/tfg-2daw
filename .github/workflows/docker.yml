@@ -52,6 +52,7 @@ jobs:
       - name: Preparar tag de imagen
         run: |
           TAG=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          echo "IMAGE_NAME=ghcr.io/${{ github.repository }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
       - name: Build y Push
@@ -60,4 +61,4 @@ jobs:
           context: .
           push: true
           # Sanitizamos el nombre de la rama (reemplazamos / por -)
-          tags: ghcr.io/dsaub/proyecto-mvc:${{ env.IMAGE_TAG }}
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
