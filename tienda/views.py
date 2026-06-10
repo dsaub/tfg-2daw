@@ -2111,13 +2111,16 @@ def descargar_recibo(request: HttpRequest, order_id: int):
             region_name=settings.AWS_S3_REGION_NAME,
             config=Config(signature_version='s3v4'),
         )
+        presign_params = {
+            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+            'Key': order.receipt_file,
+            'ResponseContentDisposition': f'attachment; filename="recibo_{order.transaction_code}.pdf"',
+        }
+        if settings.AWS_S3_BUCKET_OWNER:
+            presign_params['ExpectedBucketOwner'] = settings.AWS_S3_BUCKET_OWNER
         url = s3.generate_presigned_url(
             'get_object',
-            Params={
-                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                'Key': order.receipt_file,
-                'ResponseContentDisposition': f'attachment; filename="recibo_{order.transaction_code}.pdf"',
-            },
+            Params=presign_params,
             ExpiresIn=300,
         )
         return redirect(url)

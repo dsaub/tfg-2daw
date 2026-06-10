@@ -195,6 +195,7 @@ if S3_ENABLE:
     AWS_S3_USE_SSL = env.bool('AWS_S3_USE_SSL')
     AWS_QUERYSTRING_AUTH = env.bool('AWS_QUERYSTRING_AUTH')
     AWS_DEFAULT_ACL = env('AWS_DEFAULT_ACL', default='public-read') or None
+    AWS_S3_BUCKET_OWNER = env('AWS_S3_BUCKET_OWNER', default=None)
     AWS_S3_OBJECT_PARAMETERS = {}
 
     STORAGES = {

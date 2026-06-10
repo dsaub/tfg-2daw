@@ -104,12 +104,15 @@ def process_purchase(user_id: int, purchased_items: list, payment_method: str, t
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             region_name=settings.AWS_S3_REGION_NAME,
         )
-        s3.put_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=f"recibos/{transaction_code}.pdf",
-            Body=pdf_data,
-            ContentType="application/pdf",
-        )
+        put_args = {
+            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+            'Key': f"recibos/{transaction_code}.pdf",
+            'Body': pdf_data,
+            'ContentType': "application/pdf",
+        }
+        if settings.AWS_S3_BUCKET_OWNER:
+            put_args['ExpectedBucketOwner'] = settings.AWS_S3_BUCKET_OWNER
+        s3.put_object(**put_args)
         rel_path = f"recibos/{transaction_code}.pdf"
     else:
         rel_path = f"recibos/user_{user_id}/recibo_{transaction_code}.pdf"
