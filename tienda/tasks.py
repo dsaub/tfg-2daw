@@ -138,4 +138,67 @@ def process_purchase(user_id: int, purchased_items: list, payment_method: str, t
 
     email.attach("recibo.pdf", pdf_data, "application/pdf")
 
-    email.send()
+
+@shared_task
+def notificar_mensaje_vendedor(item_id: int, vendedor_name: str, mensaje: str):
+    """Envía un email al comprador cuando el vendedor le envía un mensaje."""
+    from django.urls import reverse
+
+    order_item = OrderItem.objects.select_related('order__buyer').get(id=item_id)
+    buyer = order_item.order.buyer
+    if not buyer or not buyer.email:
+        return
+
+    mensajes_url = f"{settings.PROTOCOL}://{settings.DOMAIN}{reverse('mensajes_comprador')}"
+
+    html_content = render_to_string(
+        'tienda/emails/order_message.html',
+        {
+            "comprador_name": buyer.get_full_name() or buyer.username,
+            "vendedor_name": vendedor_name,
+            "order_id": order_item.order.id,
+            "product_name": order_item.product_name,
+            "mensaje": mensaje,
+            "mensajes_url": mensajes_url,
+        },
+    )
+
+    send_hemail(
+        buyer.email,
+        f"Nuevo mensaje del vendedor — Pedido #{order_item.order.id}",
+        html_content,
+        f"Hola {buyer.get_full_name() or buyer.username}, el vendedor {vendedor_name} "
+        f"te ha enviado un mensaje sobre tu pedido #{order_item.order.id}."
+    )
+
+
+@shared_task
+def notificar_cambio_estado(item_id: int, nuevo_estado: str):
+    """Envía un email al comprador cuando el vendedor cambia el estado del pedido."""
+    from django.urls import reverse
+
+    order_item = OrderItem.objects.select_related('order__buyer').get(id=item_id)
+    buyer = order_item.order.buyer
+    if not buyer or not buyer.email:
+        return
+
+    compras_url = f"{settings.PROTOCOL}://{settings.DOMAIN}{reverse('mis_compras')}"
+
+    html_content = render_to_string(
+        'tienda/emails/order_status.html',
+        {
+            "comprador_name": buyer.get_full_name() or buyer.username,
+            "order_id": order_item.order.id,
+            "product_name": order_item.product_name,
+            "nuevo_estado": nuevo_estado,
+            "compras_url": compras_url,
+        },
+    )
+
+    send_hemail(
+        buyer.email,
+        f"Estado actualizado — Pedido #{order_item.order.id}",
+        html_content,
+        f"Hola {buyer.get_full_name() or buyer.username}, el estado de tu pedido "
+        f"#{order_item.order.id} ha cambiado a '{nuevo_estado}'."
+    )

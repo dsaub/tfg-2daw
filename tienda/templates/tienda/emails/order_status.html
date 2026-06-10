@@ -1,0 +1,30 @@
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+    <tr>
+        <th scope="col" align="center" style="padding: 20px;">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="border: 1px solid #eeeeee; background-color: #ffffff;">
+                <tr>
+                    <th scope="col" align="center" style="background-color: #007bff; padding: 40px;">
+                        <h1 style="color: #ffffff; font-family: sans-serif; margin: 0;">📦 Estado del pedido actualizado</h1>
+                    </th>
+                </tr>
+                <tr>
+                    <td style="padding: 30px; font-family: sans-serif; line-height: 1.5; color: #444444;">
+                        <p>Hola {{ comprador_name }},</p>
+                        <p>El estado de tu pedido ha cambiado:</p>
+                        <table width="100%" border="0" cellspacing="0" cellpadding="10" style="background-color: #f8f9fa; border-radius: 4px; margin: 15px 0;">
+                            <tr>
+                                <td style="font-family: sans-serif;">
+                                    <p style="margin: 0 0 8px 0;"><strong>Pedido #{{ order_id }}</strong> — {{ product_name }}</p>
+                                    <p style="margin: 0;">Nuevo estado: <strong>{{ nuevo_estado }}</strong></p>
+                                </td>
+                            </tr>
+                        </table>
+                        <p>Puedes revisar tus pedidos en tu <a href="{{ compras_url }}" style="color: #007bff;">portal de usuario</a>.</p>
+                        <p></p>
+                        <p style="color: #999; font-size: 0.85em;">Este email ha sido enviado automáticamente, no respondas a este correo.</p>
+                    </td>
+                </tr>
+            </table>
+        </th>
+    </tr>
+</table>
