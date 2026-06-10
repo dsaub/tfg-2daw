@@ -34,7 +34,7 @@
         {% if products %}
             {% for producto in products %}
                 <div class="card card-producto mt-5" style="width: 18rem;">
-                    <img src="/media/{{ producto.primary_image.image}}" class="card-img-top" alt="{{ producto.primary_image.alt|default:producto.name }}">
+                    <img src="{{ producto.primary_image.image.url }}" class="card-img-top" alt="{{ producto.primary_image.alt|default:producto.name }}">
                     <div class="card-body">
                         <h3 class="card-title">{{ producto.name }}</h3>
                         <div class="card-text price-info mb-3">

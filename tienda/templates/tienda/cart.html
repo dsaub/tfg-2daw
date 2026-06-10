@@ -42,7 +42,7 @@
               <td>
                 <div class="d-flex align-items-center">
                   {% if item.product.primary_image %}
-                  <img src="/media/{{ item.product.primary_image.image }}" alt="{{ item.product.primary_image.alt|default:item.product.name }}" style="width: 50px; height: 50px; object-fit: cover;" class="me-3">
+                  <img src="{{ item.product.primary_image.image.url }}" alt="{{ item.product.primary_image.alt|default:item.product.name }}" style="width: 50px; height: 50px; object-fit: cover;" class="me-3">
                   {% endif %}
                   <a href="{% url 'producto' item.product.id %}">{{ item.product.name }}</a>
                 </div>

@@ -60,4 +60,4 @@ jobs:
           context: .
           push: true
           # Sanitizamos el nombre de la rama (reemplazamos / por -)
-          tags: ghcr.io/dsaub/proyecto-mvc:${{ env.IMAGE_TAG }}
+          tags: ghcr.io/dsaub/tfg-2daw:${{ env.IMAGE_TAG }}

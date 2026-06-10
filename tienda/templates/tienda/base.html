@@ -77,7 +77,6 @@
 </head>
 <body class="d-flex flex-column min-vh-100">
     <a href="#main-content" class="skip-link">Saltar al contenido</a>
-    {% cache 500 sidebar request.user.username %}
     <nav class="navbar navbar-expand-md header" role="banner">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
@@ -134,7 +133,6 @@
             </div>
         </div>
     </nav>
-    {% endcache %}
 
     <div id="main-content" class="container-fluid flex-grow-1 d-flex flex-column" role="main">
         <!-- Mensajes -->
