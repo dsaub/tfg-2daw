@@ -13,6 +13,7 @@ RUN apk --no-cache update \
 	freetype-dev \
 	jpeg-dev \
 	zlib-dev \
+	curl \
 && pip install --no-cache-dir uv \
 && uv sync --no-dev --no-install-project # Install only dependencies, not the local project package
 
