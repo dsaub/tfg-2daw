@@ -312,6 +312,21 @@ class Order(models.Model):
     def get_items_count(self):
         return sum(item.quantity for item in self.items.all())
 
+    def get_overall_status(self):
+        status_order = {
+            OrderItem.STATUS_PENDING: 0,
+            OrderItem.STATUS_PROCESSING: 1,
+            OrderItem.STATUS_SHIPPED: 2,
+        }
+        items = list(self.items.all())
+        if not items:
+            return self.get_status_display()
+        min_status = min(
+            (item.status for item in items),
+            key=lambda s: status_order.get(s, 0)
+        )
+        return dict(OrderItem.STATUS_CHOICES).get(min_status, self.get_status_display())
+
 
 class OrderItem(models.Model):
     STATUS_PENDING = "pending"
