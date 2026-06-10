@@ -26,12 +26,10 @@ COPY ./manage.py /app/manage.py
 
 
 EXPOSE 8000
-RUN mkdir -pv /fonts
-COPY tienda/static/fonts/ /fonts/
 
 RUN addgroup -S app \
 && adduser -S app -G app \
-&& chown -R app:app /app /fonts
+&& chown -R app:app /app
 
 USER app
 
