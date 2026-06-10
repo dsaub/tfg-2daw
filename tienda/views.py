@@ -2095,6 +2095,7 @@ def mis_recibos(request: HttpRequest):
 
 
 @login_required
+@require_GET
 def descargar_recibo(request: HttpRequest, order_id: int):
     order = get_object_or_404(Order, id=order_id, buyer=request.user, status=Order.STATUS_PAID)
     if not order.receipt_file:
