@@ -42,6 +42,7 @@
                         <th>Total</th>
                         <th>Método</th>
                         <th>Referencia</th>
+                        <th>Recibo</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -53,6 +54,13 @@
                         <td>{{ receipt.total }}€</td>
                         <td>{{ receipt.get_payment_method_display }}</td>
                         <td>{{ receipt.payment_reference|default:"-" }}</td>
+                        <td>
+                            {% if receipt.receipt_file %}
+                            <a href="{% url 'descargar_recibo' receipt.id %}" class="btn btn-sm btn-success">Descargar Recibo</a>
+                            {% else %}
+                            <span class="text-muted">No disponible</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

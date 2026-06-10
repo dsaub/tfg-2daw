@@ -42,6 +42,7 @@ urlpatterns = [
     path("usuario/", views.portal_usuario, name="portal_usuario"),
     path("usuario/compras/", views.mis_compras, name="mis_compras"),
     path("usuario/recibos/", views.mis_recibos, name="mis_recibos"),
+    path("usuario/recibos/<int:order_id>/descargar/", views.descargar_recibo, name="descargar_recibo"),
     path("usuario/perfil/", views.editar_perfil, name="editar_perfil"),
     path("usuario/perfil/cambiar-contrasena/", views.cambiar_contrasena, name="cambiar_contrasena"),
     path("usuario/direcciones/", views.direcciones_usuario, name="direcciones_usuario"),

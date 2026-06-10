@@ -298,6 +298,7 @@ class Order(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default=PAYMENT_MANUAL)
     payment_reference = models.CharField(max_length=200, blank=True, default="")
     transaction_code = models.CharField(max_length=38, unique=True, null=True, blank=True, db_index=True)
+    receipt_file = models.CharField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
