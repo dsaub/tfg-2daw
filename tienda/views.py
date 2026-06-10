@@ -978,6 +978,14 @@ def cambiar_estado_pedido(request: HttpRequest, item_id: int):
     if nuevo_estado in dict(OrderItem.STATUS_CHOICES):
         order_item.status = nuevo_estado
         order_item.save()
+
+        # Enviar email al comprador de forma asíncrona
+        from .tasks import notificar_cambio_estado
+        notificar_cambio_estado.delay(
+            order_item.id,
+            order_item.get_status_display()
+        )
+
         messages.success(request, f"Estado actualizado a '{order_item.get_status_display()}'.")
     else:
         messages.error(request, "Estado no válido.")
@@ -1000,6 +1008,14 @@ def enviar_mensaje_pedido(request: HttpRequest, item_id: int):
         order_item=order_item,
         sender=request.user,
         message=mensaje
+    )
+
+    # Enviar email al comprador de forma asíncrona
+    from .tasks import notificar_mensaje_vendedor
+    notificar_mensaje_vendedor.delay(
+        order_item.id,
+        request.user.get_full_name() or request.user.username,
+        mensaje
     )
 
     messages.success(request, "Mensaje enviado correctamente.")
