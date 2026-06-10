@@ -2,8 +2,6 @@
 
 set -eu
 
-echo "Sleeping due to mysql..."
-sleep 10
 echo "Running DB migrations..."
 uv run python manage.py migrate
 echo "Collecting STATIC..."
