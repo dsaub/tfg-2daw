@@ -1,14 +1,17 @@
-from celery import shared_task
-from django.conf import settings
-from django.template.loader import render_to_string
-from django.core.mail import EmailMessage
-from .utilities import send_email, send_hemail
-from .vars import login_message, verify_message
+import os
 import secrets
 import string
-from . import pdf
 
-from .models import User, VerificationCode
+import boto3
+from celery import shared_task
+from django.conf import settings
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
+
+from . import pdf
+from .models import Order, User, VerificationCode
+from .utilities import send_email, send_hemail
+from .vars import login_message, verify_message
 @shared_task
 def enviar_correo_bienvenida(email_usuario: str, nombre_usuario: str):
     html_content = render_to_string(
@@ -92,7 +95,40 @@ def process_purchase(user_id: int, purchased_items: list, payment_method: str, t
         payment_method,
         transaction_code,
     )
-    
+
+    if settings.S3_ENABLE:
+        s3 = boto3.client(
+            's3',
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        put_args = {
+            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+            'Key': f"recibos/{transaction_code}.pdf",
+            'Body': pdf_data,
+            'ContentType': "application/pdf",
+        }
+        if settings.AWS_S3_BUCKET_OWNER:
+            put_args['ExpectedBucketOwner'] = settings.AWS_S3_BUCKET_OWNER
+        s3.put_object(**put_args)
+        rel_path = f"recibos/{transaction_code}.pdf"
+    else:
+        rel_path = f"recibos/user_{user_id}/recibo_{transaction_code}.pdf"
+        abs_dir = os.path.join(settings.MEDIA_ROOT, f"recibos/user_{user_id}")
+        os.makedirs(abs_dir, exist_ok=True)
+        abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+        with open(abs_path, 'wb') as f:
+            f.write(pdf_data)
+
+    try:
+        order = Order.objects.get(transaction_code=transaction_code)
+        order.receipt_file = rel_path
+        order.save(update_fields=['receipt_file'])
+    except Order.DoesNotExist:
+        pass
+
     email = EmailMessage(
         subject="Tu recibo de compra",
         body = "Hola, adjunto encontrarás el recibo de tu reciente transacción",

@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.db.utils import DataError
 from django.contrib.auth.decorators import login_required
@@ -28,6 +28,7 @@ import stripe
 from django.db import models, transaction
 from django.db.models import F
 from django.core.cache import cache
+import os
 import re
 import unicodedata
 import json
@@ -2091,6 +2092,49 @@ def mis_recibos(request: HttpRequest):
         "receipts": receipts,
         "total_receipts": receipts.count(),
     })
+
+
+@login_required
+@require_GET
+def descargar_recibo(request: HttpRequest, order_id: int):
+    order = get_object_or_404(Order, id=order_id, buyer=request.user, status=Order.STATUS_PAID)
+    if not order.receipt_file:
+        raise Http404("Recibo no disponible")
+
+    if settings.S3_ENABLE:
+        import boto3
+        from botocore.config import Config
+        s3 = boto3.client(
+            's3',
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+            config=Config(signature_version='s3v4'),
+        )
+        presign_params = {
+            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+            'Key': order.receipt_file,
+            'ResponseContentDisposition': f'attachment; filename="recibo_{order.transaction_code}.pdf"',
+        }
+        if settings.AWS_S3_BUCKET_OWNER:
+            presign_params['ExpectedBucketOwner'] = settings.AWS_S3_BUCKET_OWNER
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params=presign_params,
+            ExpiresIn=300,
+        )
+        return redirect(url)
+
+    file_path = os.path.join(settings.MEDIA_ROOT, order.receipt_file)
+    if not os.path.exists(file_path):
+        raise Http404("Archivo no encontrado")
+    return FileResponse(
+        open(file_path, 'rb'),
+        content_type='application/pdf',
+        as_attachment=True,
+        filename=f'recibo_{order.transaction_code}.pdf',
+    )
 
 
 @login_required

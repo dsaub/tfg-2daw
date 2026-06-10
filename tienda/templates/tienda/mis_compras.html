@@ -49,7 +49,7 @@
                         <td>{{ order.id }}</td>
                         <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
                         <td>{{ order.total }}€</td>
-                        <td><span class="badge bg-success">{{ order.get_status_display }}</span></td>
+                        <td><span class="badge bg-success">{{ order.get_overall_status }}</span></td>
                         <td>{{ order.get_payment_method_display }}</td>
                     </tr>
                     {% endfor %}
