@@ -24,6 +24,8 @@ COPY ./proyecto /app/proyecto
 COPY ./tienda /app/tienda
 COPY ./manage.py /app/manage.py
 
+COPY ./fonts /app/fonts
+
 
 EXPOSE 8000
 

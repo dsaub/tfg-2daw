@@ -335,7 +335,7 @@ class ShippingAddressForm(forms.Form):
         label="Teléfono",
         max_length=20,
         required=True,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '612 345 678'})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '612 345 678', 'type': 'tel', 'inputmode': 'numeric', 'oninput': "this.value = this.value.replace(/[^0-9+\\s]/g, '')"})
     )
     is_default = forms.BooleanField(
         label="Establecer como dirección predeterminada",
