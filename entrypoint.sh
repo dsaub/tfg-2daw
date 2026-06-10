@@ -2,6 +2,11 @@
 
 set -eu
 
+# Si se pasan argumentos, ejecutarlos directamente (ej: celery worker)
+if [ $# -gt 0 ]; then
+    exec "$@"
+fi
+
 echo "Running DB migrations..."
 uv run python manage.py migrate
 echo "Collecting STATIC..."
