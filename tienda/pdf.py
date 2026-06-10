@@ -17,8 +17,8 @@ class Recibo(FPDF):
 
 def generar_recibo(cliente: str, total: float, objetos: list, metodo_pago: str, transaction_code: str):
     pdf = Recibo()
-    pdf.add_font('Roboto', '', '/fonts/Roboto-Regular.ttf')
-    pdf.add_font('Roboto', 'B', '/fonts/Roboto-Bold.ttf')
+    pdf.add_font('Roboto', '', str(settings.BASE_DIR / 'fonts' / 'Roboto-Regular.ttf'))
+    pdf.add_font('Roboto', 'B', str(settings.BASE_DIR / 'fonts' / 'Roboto-Bold.ttf'))
     pdf.add_page()
     pdf.set_font('Roboto', size=12)
 
